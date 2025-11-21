@@ -29,6 +29,7 @@ public partial class App : Application
         services.AddSingleton<ILLMService, LlmService>();
         services.AddSingleton<IPdfProcessor, PdfProcessor>();
         services.AddSingleton<IBatchProcessor, BatchProcessor>();
+        services.AddSingleton<ITessdataService, TessdataService>();
 
         // SQLite-backed jobs repository
         services.AddSingleton<IJobRepository>(sp =>
@@ -49,7 +50,12 @@ public partial class App : Application
         Services = ConfigureServices();
 
         // Log app start
-        Services.GetRequiredService<ILoggingService>().Info("Application starting.");
+        // Log app start
+        var log = Services.GetRequiredService<ILoggingService>();
+        log.Info("Application starting.");
+
+        // Ensure tessdata exists
+        _ = Services.GetRequiredService<ITessdataService>().EnsureTessdataExistsAsync();
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

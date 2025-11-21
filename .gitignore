@@ -32,3 +32,4 @@ Thumbs.db
 *.temp
 
 build_*.txt
+restore_*.txt

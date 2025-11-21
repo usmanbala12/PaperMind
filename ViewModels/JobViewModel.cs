@@ -38,14 +38,18 @@ namespace PaperMind.ViewModels
             };
 
             Errors = new ObservableCollection<FileProcessingError>();
-            Errors.CollectionChanged += (_, __) => this.RaisePropertyChanged(nameof(HasErrors));
+            Errors.CollectionChanged += (_, __) =>
+            {
+                this.RaisePropertyChanged(nameof(HasErrors));
+                this.RaisePropertyChanged(nameof(ErrorCount));
+            };
 
             CancelCommand = ReactiveCommand.CreateFromTask(CancelAsync);
             BackCommand = ReactiveCommand.Create(() => _navigateBack?.Invoke());
 
-            StartCommand = ReactiveCommand.CreateFromTask(StartAsync, this.WhenAnyValue(vm => vm.Status, s => s != JobStatus.Running && s != JobStatus.Completed));
+            StartCommand = ReactiveCommand.CreateFromTask(StartAsync, this.WhenAnyValue(vm => vm.Status, s => s != JobStatus.Running && s != JobStatus.Completed && s != JobStatus.CompletedWithErrors));
             StopCommand = ReactiveCommand.CreateFromTask(StopAsync, this.WhenAnyValue(vm => vm.Status, s => s == JobStatus.Running));
-            ResumeCommand = ReactiveCommand.CreateFromTask(ResumeAsync, this.WhenAnyValue(vm => vm.Status, s => s == JobStatus.Cancelled || s == JobStatus.Failed));
+            ResumeCommand = ReactiveCommand.CreateFromTask(ResumeAsync, this.WhenAnyValue(vm => vm.Status, s => s == JobStatus.Cancelled || s == JobStatus.Failed || s == JobStatus.CompletedWithErrors));
 
             UpdateFromJob(_job, addLog: false);
             _pollTimer = new Timer(async _ => await PollAsync().ConfigureAwait(false), null, 500, 500);
@@ -59,9 +63,9 @@ namespace PaperMind.ViewModels
         public JobStatus Status => _job.Status;
         public bool IsRunning => Status == JobStatus.Running;
         public bool IsNotRunning => !IsRunning;
-        public bool ShowStart => Status == JobStatus.Pending || Status == JobStatus.Completed || Status == JobStatus.Failed;
+        public bool ShowStart => Status == JobStatus.Pending || Status == JobStatus.Completed || Status == JobStatus.Failed || Status == JobStatus.CompletedWithErrors;
         public bool ShowStop => Status == JobStatus.Running;
-        public bool ShowResume => Status == JobStatus.Cancelled || Status == JobStatus.Failed;
+        public bool ShowResume => Status == JobStatus.Cancelled || Status == JobStatus.Failed || Status == JobStatus.CompletedWithErrors;
 
         public double ProgressPercent
         {
@@ -79,6 +83,7 @@ namespace PaperMind.ViewModels
         public ObservableCollection<FileProcessingError> Errors { get; }
 
         public bool HasErrors => Errors.Count > 0;
+        public int ErrorCount => Errors.Count;
 
         public bool HasLogs => Logs.Count > 0;
         public bool ShowBlankLogs => Status == JobStatus.Pending && !HasLogs;
@@ -118,6 +123,7 @@ namespace PaperMind.ViewModels
                     JobStatus.Running => $"Started processing {j.TotalFiles} file(s)",
                     JobStatus.Completed when j.TotalFiles == 0 => "No PDF files found in input folder",
                     JobStatus.Completed => $"Completed: {j.FilesProcessed} file(s) processed",
+                    JobStatus.CompletedWithErrors => $"Completed with {j.Errors.Count} errors",
                     JobStatus.Cancelled => "Job was cancelled",
                     JobStatus.Failed => "Job failed",
                     JobStatus.Pending => "Job created and pending",
@@ -159,6 +165,7 @@ namespace PaperMind.ViewModels
             JobStatus.Pending => "Pending",
             JobStatus.Running => "Running",
             JobStatus.Completed => "Completed",
+            JobStatus.CompletedWithErrors => "Completed with Errors",
             JobStatus.Cancelled => "Cancelled",
             JobStatus.Failed => "Failed",
             _ => status.ToString()

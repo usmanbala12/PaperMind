@@ -47,7 +47,7 @@
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
               <StackPanel Orientation="Horizontal" Spacing="12">
                 <RadioButton Content="Logs" IsChecked="True" GroupName="ViewMode" x:Name="LogsRadio"/>
-                <RadioButton Content="Errors" IsChecked="False" GroupName="ViewMode" IsVisible="{Binding HasErrors}" Foreground="#DC3545"/>
+                <RadioButton Content="{Binding ErrorCount, StringFormat='Errors ({0})'}" IsChecked="False" GroupName="ViewMode" IsVisible="{Binding HasErrors}" Foreground="#DC3545"/>
               </StackPanel>
             </Grid>
           </Border>

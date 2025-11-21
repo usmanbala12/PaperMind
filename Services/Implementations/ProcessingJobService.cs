@@ -165,7 +165,15 @@ namespace PaperMind.Services.Implementations
                     }
                 }
 
-                job.Status = JobStatus.Completed;
+                if (job.Errors.Count > 0)
+                {
+                    job.Status = JobStatus.CompletedWithErrors;
+                    _log.Warn($"Job {job.JobId} completed with {job.Errors.Count} errors.");
+                }
+                else
+                {
+                    job.Status = JobStatus.Completed;
+                }
             }
             catch (OperationCanceledException)
             {

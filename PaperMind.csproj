@@ -20,12 +20,30 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+    <PackageReference Include="SkiaSharp" Version="2.88.*" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="2.88.*" />
     <PackageReference Include="ReactiveUI.Avalonia" Version="11.3.8" />
     <PackageReference Include="Tesseract" Version="5.0.0" />
-    <PackageReference Include="UglyToad.PdfPig" Version="0.1.9-alpha001-patch1" />
-    <PackageReference Include="PdfSharp" Version="1.50.5147" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.0" />
+    <PackageReference Include="PdfPig" Version="0.1.12" />
+
   </ItemGroup>
+
+  <ItemGroup>
+    <None Update="tessdata\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <Target Name="DownloadTessdata" BeforeTargets="Build">
+    <PropertyGroup>
+      <TessdataDir>$(ProjectDir)tessdata</TessdataDir>
+      <TessdataFile>$(TessdataDir)\eng.traineddata</TessdataFile>
+    </PropertyGroup>
+    <MakeDir Directories="$(TessdataDir)" Condition="!Exists('$(TessdataDir)')" />
+    <Exec Command="powershell -Command &quot;Invoke-WebRequest -Uri 'https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata' -OutFile '$(TessdataFile)'&quot;" Condition="!Exists('$(TessdataFile)')" />
+  </Target>
+
 </Project>
