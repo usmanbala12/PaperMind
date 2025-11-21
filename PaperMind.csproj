@@ -40,10 +40,12 @@
   <Target Name="DownloadTessdata" BeforeTargets="Build">
     <PropertyGroup>
       <TessdataDir>$(ProjectDir)tessdata</TessdataDir>
-      <TessdataFile>$(TessdataDir)\eng.traineddata</TessdataFile>
+      <EngFile>$(TessdataDir)\eng.traineddata</EngFile>
+      <OsdFile>$(TessdataDir)\osd.traineddata</OsdFile>
     </PropertyGroup>
     <MakeDir Directories="$(TessdataDir)" Condition="!Exists('$(TessdataDir)')" />
-    <Exec Command="powershell -Command &quot;Invoke-WebRequest -Uri 'https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata' -OutFile '$(TessdataFile)'&quot;" Condition="!Exists('$(TessdataFile)')" />
+    <Exec Command="powershell -Command &quot;Invoke-WebRequest -Uri 'https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata' -OutFile '$(EngFile)'&quot;" Condition="!Exists('$(EngFile)')" />
+    <Exec Command="powershell -Command &quot;Invoke-WebRequest -Uri 'https://github.com/tesseract-ocr/tessdata_fast/raw/main/osd.traineddata' -OutFile '$(OsdFile)'&quot;" Condition="!Exists('$(OsdFile)')" />
   </Target>
 
 </Project>
