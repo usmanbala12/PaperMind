@@ -1,0 +1,94 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PaperMind.Views.JobView"
+             xmlns:vm="using:PaperMind.ViewModels"
+             x:DataType="vm:JobViewModel">
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Background="#F8F9FA" Margin="16">
+    <!-- Header -->
+    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,12">
+      <Button Content="← Back" Command="{Binding BackCommand}"/>
+      <TextBlock Grid.Column="1" Text="Job Details" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <TextBlock Text="{Binding StatusText}" Margin="0,0,8,0"/>
+        <Button Content="▶ Start" Command="{Binding StartCommand}" IsVisible="{Binding ShowStart}"/>
+        <Button Content="■ Stop" Command="{Binding StopCommand}" IsVisible="{Binding ShowStop}" Background="#DC3545" Foreground="White"/>
+        <Button Content="⏵ Resume" Command="{Binding ResumeCommand}" IsVisible="{Binding ShowResume}"/>
+      </StackPanel>
+    </Grid>
+
+    <!-- Summary -->
+    <Border Grid.Row="1" Background="White" CornerRadius="8" BorderBrush="#E1E4E8" BorderThickness="1" Padding="12" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="Auto,*,Auto, *" RowDefinitions="Auto,Auto">
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Job ID:" FontWeight="SemiBold"/>
+        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding JobId}"/>
+        <TextBlock Grid.Row="0" Grid.Column="2" Text="Status:" HorizontalAlignment="Right"/>
+        <TextBlock Grid.Row="0" Grid.Column="3" Text="{Binding StatusText}"/>
+
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="Input:"/>
+        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding InputFolder, Mode=OneWay}" IsReadOnly="True" IsEnabled="{Binding IsNotRunning}"/>
+        <TextBlock Grid.Row="1" Grid.Column="2" Text="Output:"/>
+        <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding OutputFolder, Mode=OneWay}" IsReadOnly="True" IsEnabled="{Binding IsNotRunning}"/>
+      </Grid>
+    </Border>
+
+    <!-- Progress & Logs -->
+    <Grid Grid.Row="2" ColumnDefinitions="*,2*" ColumnSpacing="12">
+      <Border Background="White" CornerRadius="8" BorderBrush="#E1E4E8" BorderThickness="1" Padding="16">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Progress" FontWeight="SemiBold"/>
+          <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" Height="14"/>
+          <TextBlock Text="{Binding FilesProcessed}"/>
+          <TextBlock Text="{Binding TotalFiles}"/>
+        </StackPanel>
+      </Border>
+      <Border Grid.Column="1" Background="White" CornerRadius="8" BorderBrush="#E1E4E8" BorderThickness="1" Padding="0">
+        <Grid RowDefinitions="Auto,*">
+          <Border Grid.Row="0" Background="#F6F8FA" BorderBrush="#E1E4E8" BorderThickness="0,0,0,1" Padding="12">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+              <StackPanel Orientation="Horizontal" Spacing="12">
+                <RadioButton Content="Logs" IsChecked="True" GroupName="ViewMode" x:Name="LogsRadio"/>
+                <RadioButton Content="Errors" IsChecked="False" GroupName="ViewMode" IsVisible="{Binding HasErrors}" Foreground="#DC3545"/>
+              </StackPanel>
+            </Grid>
+          </Border>
+          <Grid Grid.Row="1">
+            <!-- Logs View -->
+            <Grid IsVisible="{Binding IsChecked, ElementName=LogsRadio}">
+                <Border Background="Black" IsVisible="{Binding ShowBlankLogs}"/>
+                <ScrollViewer Padding="12" IsVisible="{Binding HasLogs}">
+                  <ItemsControl ItemsSource="{Binding Logs}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding}" FontFamily="Consolas"/>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- Errors View -->
+            <Grid IsVisible="{Binding !IsChecked, ElementName=LogsRadio}">
+                <ScrollViewer Padding="12">
+                    <ItemsControl ItemsSource="{Binding Errors}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="#DC3545" BorderThickness="0,0,0,1" Padding="0,0,0,8" Margin="0,0,0,8">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="{Binding FileName}" FontWeight="Bold" Foreground="#DC3545"/>
+                                        <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding Timestamp}" FontSize="12" Foreground="Gray"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+          </Grid>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <TextBlock Grid.Row="3" Text="Tip: You can navigate back to create or start new jobs" Foreground="#6A737D" HorizontalAlignment="Center" Margin="0,12,0,0"/>
+  </Grid>
+</UserControl>

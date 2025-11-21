@@ -1,0 +1,105 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PaperMind.Views.SettingsView">
+  
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="16" Spacing="16" MaxWidth="800">
+      <TextBlock Text="Settings" FontSize="24" FontWeight="Bold"/>
+      <TextBlock Text="Configure application settings" Foreground="#6A737D"/>
+
+      <!-- General Settings -->
+      <Border Background="White" BorderBrush="#E1E4E8" BorderThickness="1" CornerRadius="8" Padding="16">
+        <StackPanel Spacing="12">
+          <TextBlock Text="General" FontSize="16" FontWeight="SemiBold"/>
+          
+          <StackPanel Spacing="8">
+            <TextBlock Text="Theme" FontWeight="Medium"/>
+            <ComboBox Width="250" HorizontalAlignment="Left">
+              <ComboBoxItem IsSelected="True">System</ComboBoxItem>
+              <ComboBoxItem>Light</ComboBoxItem>
+              <ComboBoxItem>Dark</ComboBoxItem>
+            </ComboBox>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- OCR Settings -->
+      <Border Background="White" BorderBrush="#E1E4E8" BorderThickness="1" CornerRadius="8" Padding="16">
+        <StackPanel Spacing="12">
+          <TextBlock Text="OCR Settings" FontSize="16" FontWeight="SemiBold"/>
+          
+          <StackPanel Spacing="8">
+            <TextBlock Text="Language" FontWeight="Medium"/>
+            <ComboBox Width="250" HorizontalAlignment="Left">
+              <ComboBoxItem IsSelected="True">English (eng)</ComboBoxItem>
+              <ComboBoxItem>French (fra)</ComboBoxItem>
+              <ComboBoxItem>German (deu)</ComboBoxItem>
+              <ComboBoxItem>Spanish (spa)</ComboBoxItem>
+            </ComboBox>
+          </StackPanel>
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="Quality" FontWeight="Medium"/>
+            <ComboBox Width="250" HorizontalAlignment="Left">
+              <ComboBoxItem>Fast</ComboBoxItem>
+              <ComboBoxItem IsSelected="True">Balanced</ComboBoxItem>
+              <ComboBoxItem>High</ComboBoxItem>
+            </ComboBox>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- LLM Settings -->
+      <Border Background="White" BorderBrush="#E1E4E8" BorderThickness="1" CornerRadius="8" Padding="16">
+        <StackPanel Spacing="12">
+          <TextBlock Text="LLM Provider" FontSize="16" FontWeight="SemiBold"/>
+          
+          <StackPanel Spacing="8">
+            <TextBlock Text="Provider" FontWeight="Medium"/>
+            <ComboBox Width="250" HorizontalAlignment="Left">
+              <ComboBoxItem IsSelected="True">OpenAI</ComboBoxItem>
+              <ComboBoxItem>Anthropic</ComboBoxItem>
+            </ComboBox>
+          </StackPanel>
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="Model" FontWeight="Medium"/>
+            <TextBox Width="350" HorizontalAlignment="Left" 
+                     Watermark="e.g., gpt-4o-mini or claude-3-haiku-20240307"/>
+          </StackPanel>
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="API Key" FontWeight="Medium"/>
+            <TextBox Width="450" HorizontalAlignment="Left" 
+                     PasswordChar="*"
+                     Watermark="Enter your API key"/>
+            <TextBlock Text="Your API key is stored securely" 
+                       FontSize="11" Foreground="#6A737D"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Performance Settings -->
+      <Border Background="White" BorderBrush="#E1E4E8" BorderThickness="1" CornerRadius="8" Padding="16">
+        <StackPanel Spacing="12">
+          <TextBlock Text="Performance" FontSize="16" FontWeight="SemiBold"/>
+          
+          <StackPanel Spacing="8">
+            <TextBlock Text="Max Concurrent Operations" FontWeight="Medium"/>
+            <NumericUpDown Width="150" HorizontalAlignment="Left" 
+                           Value="2" Minimum="1" Maximum="10" Increment="1"/>
+            <TextBlock Text="Higher values use more CPU and memory" 
+                       FontSize="11" Foreground="#6A737D"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Action Buttons -->
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <Button Content="Save Settings" Width="120" 
+                Background="#28a745" Foreground="White" Padding="8"/>
+        <Button Content="Reset" Width="100" Padding="8"/>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

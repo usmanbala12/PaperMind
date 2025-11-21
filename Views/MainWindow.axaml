@@ -1,0 +1,41 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="PaperMind.Views.MainWindow"
+        Title="PaperMind - OCR Bulk Processor"
+        Width="1100" Height="750"
+        MinWidth="1000" MinHeight="650"
+        Background="#F8F9FA">
+  <TabControl x:Name="MainTabs" Background="#F8F9FA">
+    <!-- Job Tab: shows selected/running job details and logs -->
+    <TabItem Header="Job">
+      <Border Background="#F8F9FA" Padding="0">
+        <!-- Code-behind injects JobView here (real-time logs when running, saved logs otherwise) -->
+        <ContentControl x:Name="JobTabHost"/>
+      </Border>
+    </TabItem>
+
+    <!-- Jobs Tab: shows list of created jobs and creation form -->
+    <TabItem Header="Jobs">
+      <Border Background="#F8F9FA" Padding="0">
+        <!-- Code-behind injects JobsView here (list + new job form) -->
+        <ContentControl x:Name="JobsTabHost"/>
+      </Border>
+    </TabItem>
+
+    <!-- Settings Tab: application configuration -->
+    <TabItem Header="Settings">
+      <Border Background="#F8F9FA" Padding="0">
+        <!-- Code-behind injects SettingsView here -->
+        <ContentControl x:Name="SettingsTabHost"/>
+      </Border>
+    </TabItem>
+
+    <!-- Logs Tab: view application logs -->
+    <TabItem Header="Logs">
+      <Border Background="#F8F9FA" Padding="0">
+        <!-- Code-behind injects LogsView here -->
+        <ContentControl x:Name="LogsTabHost"/>
+      </Border>
+    </TabItem>
+  </TabControl>
+</Window>

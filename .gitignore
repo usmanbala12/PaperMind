@@ -1,0 +1,34 @@
+# Build artifacts
+bin/
+obj/
+
+# Visual Studio & Rider specific
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs
+*.log
+
+# NuGet
+*.nupkg
+packages/
+.nuget/
+
+# Avalonia specific
+**/App.axaml.csproj.user
+**/*.axaml.cs.designer.cs
+
+# Dotnet tools
+*.dotnet-tools.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary
+*.tmp
+*.temp
+
+build_*.txt

@@ -1,0 +1,206 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PaperMind.ViewModels"
+             xmlns:models="using:PaperMind.Models"
+             xmlns:enums="using:PaperMind.Models.Enums"
+             x:Class="PaperMind.Views.LogsView"
+             x:DataType="vm:LogsViewModel"
+             Background="#F8F9FA">
+  
+  <UserControl.Styles>
+    <!-- DataGrid Styles for Log Levels -->
+    <Style Selector="DataGridRow">
+      <Setter Property="Background" Value="White"/>
+    </Style>
+    
+    <Style Selector="DataGridRow:nth-child(even)">
+      <Setter Property="Background" Value="#F8F9FA"/>
+    </Style>
+    
+    <!-- Info Level Highlighting -->
+    <Style Selector="DataGridRow[Tag=Information]">
+      <Setter Property="Foreground" Value="#0078D4"/>
+    </Style>
+    
+    <!-- Warning Level Highlighting -->
+    <Style Selector="DataGridRow[Tag=Warning]">
+      <Setter Property="Foreground" Value="#FF8C00"/>
+    </Style>
+    
+    <!-- Error Level Highlighting -->
+    <Style Selector="DataGridRow[Tag=Error]">
+      <Setter Property="Foreground" Value="#D13438"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <!-- Button Styles -->
+    <Style Selector="Button.action-button">
+      <Setter Property="Background" Value="#0078D4"/>
+      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="Padding" Value="12,6"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Margin" Value="4,0"/>
+    </Style>
+
+    <Style Selector="Button.action-button:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#005A9E"/>
+    </Style>
+
+    <Style Selector="Button.secondary-button">
+      <Setter Property="Background" Value="White"/>
+      <Setter Property="Foreground" Value="#0078D4"/>
+      <Setter Property="Padding" Value="12,6"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="BorderBrush" Value="#0078D4"/>
+      <Setter Property="Margin" Value="4,0"/>
+    </Style>
+
+    <Style Selector="Button.secondary-button:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#F0F6FF"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,*,Auto" Margin="16">
+    
+    <!-- Header Section -->
+    <Border Grid.Row="0" 
+            Background="White" 
+            CornerRadius="8" 
+            Padding="16" 
+            Margin="0,0,0,12"
+            BoxShadow="0 1 3 0 #20000000">
+      <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto">
+        
+        <!-- Search and Filters Row -->
+        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="12">
+          
+          <!-- Search Box -->
+          <StackPanel>
+            <TextBlock Text="Search" 
+                       FontSize="12" 
+                       Foreground="#6C757D" 
+                       Margin="0,0,0,4"/>
+            <TextBox Text="{Binding SearchText}" 
+                     Watermark="Search logs..."
+                     Width="250"
+                     VerticalAlignment="Center"/>
+          </StackPanel>
+
+          <!-- Log Level Filter -->
+          <StackPanel>
+            <TextBlock Text="Level" 
+                       FontSize="12" 
+                       Foreground="#6C757D" 
+                       Margin="0,0,0,4"/>
+            <ComboBox SelectedItem="{Binding SelectedLogLevel}"
+                      ItemsSource="{Binding LogLevelOptions}"
+                      Width="120"
+                      VerticalAlignment="Center">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="enums:LogLevel">
+                  <TextBlock Text="{Binding}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+          </StackPanel>
+
+          <!-- Auto-scroll Checkbox -->
+          <CheckBox IsChecked="{Binding AutoScroll}" 
+                    Content="Auto-scroll"
+                    VerticalAlignment="Bottom"
+                    Margin="8,0,0,0"/>
+        </StackPanel>
+
+        <!-- Action Buttons -->
+        <StackPanel Grid.Row="0" Grid.Column="1" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom">
+          <Button Command="{Binding RefreshCommand}" 
+                  Classes="secondary-button"
+                  Content="🔄 Refresh"
+                  ToolTip.Tip="Reload logs from file"/>
+          <Button Command="{Binding ClearCommand}" 
+                  Classes="secondary-button"
+                  Content="🗑️ Clear"
+                  ToolTip.Tip="Clear in-memory logs"/>
+          <Button Command="{Binding ExportCommand}" 
+                  Classes="action-button"
+                  Content="💾 Export"
+                  ToolTip.Tip="Export logs to file"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Logs DataGrid -->
+    <Border Grid.Row="1" 
+            Background="White" 
+            CornerRadius="8" 
+            Padding="0"
+            BoxShadow="0 1 3 0 #20000000">
+      <DataGrid ItemsSource="{Binding FilteredLogs}"
+                AutoGenerateColumns="False"
+                IsReadOnly="True"
+                GridLinesVisibility="None"
+                HeadersVisibility="Column"
+                SelectionMode="Single"
+                CanUserReorderColumns="False"
+                CanUserResizeColumns="True"
+                CanUserSortColumns="True">
+        
+        <DataGrid.Columns>
+          
+          <!-- Timestamp Column -->
+          <DataGridTextColumn Header="Timestamp" 
+                              Width="180"
+                              Binding="{Binding Timestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss.fff}'}"/>
+          
+          <!-- Level Column -->
+          <DataGridTextColumn Header="Level" 
+                              Width="100"
+                              Binding="{Binding Level}"/>
+          
+          <!-- Message Column -->
+          <DataGridTextColumn Header="Message" 
+                              Width="*"
+                              Binding="{Binding Message}"/>
+        </DataGrid.Columns>
+
+        <!-- Row styling based on log level -->
+        <DataGrid.Styles>
+          <Style Selector="DataGridRow" x:DataType="models:LogEntry">
+            <Setter Property="Tag" Value="{Binding Level}"/>
+          </Style>
+        </DataGrid.Styles>
+
+      </DataGrid>
+    </Border>
+
+    <!-- Footer / Status Bar -->
+    <Border Grid.Row="2" 
+            Background="White" 
+            CornerRadius="8" 
+            Padding="12,8" 
+            Margin="0,12,0,0"
+            BoxShadow="0 1 3 0 #20000000">
+      <Grid ColumnDefinitions="Auto,*">
+        <TextBlock Grid.Column="0" 
+                   Text="{Binding StatusText}" 
+                   FontSize="12" 
+                   Foreground="#6C757D"
+                   VerticalAlignment="Center"/>
+        
+        <TextBlock Grid.Column="1" 
+                   Text="💡 Tip: Use search to filter logs by message or exception content" 
+                   FontSize="11" 
+                   Foreground="#ADB5BD"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Center"
+                   FontStyle="Italic"/>
+      </Grid>
+    </Border>
+
+  </Grid>
+</UserControl>

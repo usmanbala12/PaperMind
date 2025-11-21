@@ -1,0 +1,113 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PaperMind.Views.JobsView"
+             x:Name="Root"
+             xmlns:vm="using:PaperMind.ViewModels"
+             x:DataType="vm:JobsViewModel">
+  <Grid ColumnDefinitions="340,*" Background="#F8F9FA">
+    <!-- Left: New Job Form -->
+    <Border Grid.Column="0" Background="White" BorderBrush="#E1E4E8" BorderThickness="0,0,1,0" Padding="24">
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="16">
+          <StackPanel Spacing="4">
+            <TextBlock Text="Create Processing Job" FontSize="20" FontWeight="Bold"/>
+            <TextBlock Text="Select folders, steps and save or start" Foreground="#6A737D"/>
+          </StackPanel>
+
+          <Separator Background="#E1E4E8" Height="1"/>
+
+          <!-- Input -->
+          <StackPanel Spacing="6">
+            <TextBlock Text="Input Folder" FontWeight="SemiBold"/>
+            <Grid ColumnDefinitions="*,Auto">
+              <Border Grid.Column="0" Background="#F6F8FA" BorderBrush="#D1D5DA" BorderThickness="1" CornerRadius="6" Padding="10,8">
+                <TextBlock Text="{Binding InputFolder}" TextTrimming="CharacterEllipsis">
+                  <TextBlock.Styles>
+                    <Style Selector="TextBlock[Text='']">
+                      <Setter Property="Text" Value="No folder selected"/>
+                      <Setter Property="Foreground" Value="#959DA5"/>
+                    </Style>
+                  </TextBlock.Styles>
+                </TextBlock>
+              </Border>
+              <Button Grid.Column="1" Content="📂" Command="{Binding SelectInputFolderCommand}" Width="40" Height="34" Margin="6,0,0,0" Background="#0366D6" Foreground="White" CornerRadius="6"/>
+            </Grid>
+          </StackPanel>
+
+          <!-- Output -->
+          <StackPanel Spacing="6">
+            <TextBlock Text="Output Folder" FontWeight="SemiBold"/>
+            <Grid ColumnDefinitions="*,Auto">
+              <Border Grid.Column="0" Background="#F6F8FA" BorderBrush="#D1D5DA" BorderThickness="1" CornerRadius="6" Padding="10,8">
+                <TextBlock Text="{Binding OutputFolder}" TextTrimming="CharacterEllipsis">
+                  <TextBlock.Styles>
+                    <Style Selector="TextBlock[Text='']">
+                      <Setter Property="Text" Value="No folder selected"/>
+                      <Setter Property="Foreground" Value="#959DA5"/>
+                    </Style>
+                  </TextBlock.Styles>
+                </TextBlock>
+              </Border>
+              <Button Grid.Column="1" Content="📂" Command="{Binding SelectOutputFolderCommand}" Width="40" Height="34" Margin="6,0,0,0" Background="#0366D6" Foreground="White" CornerRadius="6"/>
+            </Grid>
+          </StackPanel>
+
+          <Separator Background="#E1E4E8" Height="1"/>
+
+          <!-- Steps -->
+          <StackPanel Spacing="6">
+            <TextBlock Text="Steps" FontWeight="SemiBold"/>
+            <CheckBox Content="OCR to searchable PDF" IsChecked="{Binding StepOcrToSearchablePdf}"/>
+            <CheckBox Content="LLM rename" IsChecked="{Binding StepLlmRename}"/>
+            <CheckBox Content="Upload to cloud" IsChecked="{Binding StepUploadToCloud}"/>
+          </StackPanel>
+
+          <!-- OCR Options -->
+          <StackPanel Spacing="6">
+            <TextBlock Text="OCR Options" FontWeight="SemiBold"/>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Language:" VerticalAlignment="Center"/>
+              <ComboBox ItemsSource="{Binding AvailableLanguages}" SelectedItem="{Binding OcrLanguage}" Width="140"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Quality:" VerticalAlignment="Center"/>
+              <ComboBox ItemsSource="{Binding AvailableQualities}" SelectedItem="{Binding OcrQuality}" Width="160"/>
+            </StackPanel>
+          </StackPanel>
+
+          <!-- Actions -->
+          <StackPanel Spacing="8">
+            <Button Content="💾 Save Job" Command="{Binding SaveJobCommand}" IsEnabled="{Binding CanSave}" Height="40" CornerRadius="6" Background="#6f42c1" Foreground="White"/>
+            <Button Content="▶️ Start Job" Command="{Binding StartJobCommand}" IsEnabled="{Binding CanStart}" Height="44" CornerRadius="6" Background="#28A745" Foreground="White"/>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+
+    <!-- Right: Jobs List -->
+    <Grid Grid.Column="1" Margin="24" RowDefinitions="Auto,*">
+      <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+        <TextBlock Text="Jobs" FontSize="24" FontWeight="Bold"/>
+        <Button Grid.Column="1" Content="Refresh" Command="{Binding RefreshJobsCommand}"/>
+      </Grid>
+      <Border Grid.Row="1" Background="White" BorderBrush="#E1E4E8" BorderThickness="1" CornerRadius="8">
+        <ScrollViewer>
+          <ListBox ItemsSource="{Binding Jobs}" SelectedItem="{Binding SelectedJob, Mode=OneWayToSource}">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Border BorderBrush="#E1E4E8" BorderThickness="0,0,0,1" Padding="12">
+                  <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto">
+                    <TextBlock Grid.Column="0" Grid.Row="0" Text="{Binding InputFolder}" FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="0" Grid.Row="1" Text="{Binding OutputFolder}" Foreground="#6A737D"/>
+                    <TextBlock Grid.Column="1" Grid.RowSpan="2" Text="{Binding Status}" Margin="12,0" VerticalAlignment="Center"/>
+                    <Button Grid.Column="2" Grid.RowSpan="2" Content="Open" Command="{Binding DataContext.OpenJobCommand, ElementName=Root}" CommandParameter="{Binding}"/>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

@@ -1,0 +1,21 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="using:PaperMind.Converters"
+             x:Class="PaperMind.App"
+             RequestedThemeVariant="Default">
+
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+    </Application.Styles>
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <converters:EmptyStringToGrayConverter x:Key="EmptyStringToGrayConverter"/>
+            <converters:ProcessingButtonTextConverter x:Key="ProcessingButtonTextConverter"/>
+            <converters:PercentToWidthConverter x:Key="PercentToWidthConverter"/>
+            <converters:LogLevelToColorConverter x:Key="LogLevelToColorConverter"/>
+        </ResourceDictionary>
+    </Application.Resources>
+
+</Application>
