@@ -20,6 +20,7 @@ namespace PaperMind.Services.Implementations
         private readonly ILoggingService _log;
         private readonly ITessdataService _tessdataService;
         private TesseractEngine? _sharedEngine;
+        private static SKTypeface? _cachedTypeface;
 
         public OcrService(IConfigurationService config, ILoggingService log, ITessdataService tessdataService)
         {
@@ -93,6 +94,7 @@ namespace PaperMind.Services.Implementations
             await _tessdataService.EnsureTessdataExistsAsync();
 
             var engine = GetOrCreateEngine(language, config.UseLstmOnly, config.MaxThreadsPerEngine);
+            var typeface = GetEmbeddedTypeface(); // Critical for diacritics!
 
             SKFileWStream? outputStream = null;
             SKDocument? skDocument = null;
@@ -104,6 +106,7 @@ namespace PaperMind.Services.Implementations
                 skDocument = SKDocument.CreatePdf(outputStream, new SKDocumentPdfMetadata
                 {
                     Title = Path.GetFileNameWithoutExtension(pdfPath),
+                    Author = "PaperMind OCR",
                     Creator = "PaperMind OCR",
                     Producer = "PaperMind OCR",
                     Creation = DateTime.Now,
@@ -130,11 +133,10 @@ namespace PaperMind.Services.Implementations
                         Stage = "Extracting image"
                     });
 
-                    // Extract best image (PNG preferred)
                     byte[]? imageBytes = null;
                     foreach (var img in page.GetImages())
                     {
-                        if (img.TryGetPng(out var png) && png != null && png.Count() > 1000)
+                        if (img.TryGetPng(out var png) && png?.Count() > 1000)
                         {
                             imageBytes = png.ToArray();
                             break;
@@ -157,12 +159,11 @@ namespace PaperMind.Services.Implementations
                         continue;
                     }
 
-                    // OCR
                     config.Progress?.Report(new OcrProgress
                     {
                         PageIndex = idx + 1,
                         TotalPages = pagesToProcess.Count,
-                        Stage = "OCR"
+                        Stage = "Running OCR"
                     });
 
                     string pageText = string.Empty;
@@ -180,28 +181,26 @@ namespace PaperMind.Services.Implementations
                     if (!string.IsNullOrEmpty(pageText))
                         combinedText.AppendLine(pageText);
 
-                    // Write searchable PDF
-                    if (skDocument != null)
+                    if (skDocument != null && !string.IsNullOrEmpty(hocrText))
                     {
                         config.Progress?.Report(new OcrProgress
                         {
                             PageIndex = idx + 1,
                             TotalPages = pagesToProcess.Count,
-                            Stage = "Writing PDF"
+                            Stage = "Writing searchable layer"
                         });
 
                         var canvas = skDocument.BeginPage((float)page.Width, (float)page.Height);
 
+                        // Draw original scanned image
                         using (var skImage = SKImage.FromEncodedData(imageBytes))
                         using (var bitmap = SKBitmap.FromImage(skImage))
                         {
                             canvas.DrawBitmap(bitmap, SKRect.Create(0, 0, (float)page.Width, (float)page.Height));
                         }
 
-                        if (!string.IsNullOrEmpty(hocrText))
-                        {
-                            DrawHocrText(canvas, hocrText, dpi);
-                        }
+                        // Draw invisible searchable text
+                        DrawHocrText(canvas, hocrText, dpi, typeface);
 
                         skDocument.EndPage();
                         canvas.Dispose();
@@ -296,53 +295,100 @@ namespace PaperMind.Services.Implementations
         private static int GetDpiFromQuality(OcrQuality q) => q switch
         {
             OcrQuality.Fast => 250,
-            OcrQuality.Balanced => 300,
-            OcrQuality.High => 400,
-            _ => 300
+            OcrQuality.Balanced => 350,  // Better than 300
+            OcrQuality.High => 450,
+            _ => 350
         };
 
-        private static void DrawHocrText(SKCanvas canvas, string hocr, int dpi)
+        // Critical: Use a real font with full Unicode support
+        private static SKTypeface GetEmbeddedTypeface()
         {
-            var paint = new SKPaint
+            if (_cachedTypeface != null)
+                return _cachedTypeface;
+
+            var fontPaths = new[]
             {
-                Color = SKColors.Transparent,
-                TextSize = 1,
-                IsAntialias = false,
-                Typeface = SKTypeface.Default,
-                HintingLevel = SKPaintHinting.NoHinting
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "fonts", "arial.ttf"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "fonts", "Arial.ttf"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "fonts", "liberation-sans.ttf"),
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "/System/Library/Fonts/Arial.ttf", // macOS
+                @"C:\Windows\Fonts\arial.ttf"      // Windows
             };
 
-            var lines = hocr.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (var line in lines)
+            foreach (var path in fontPaths)
             {
-                if (!line.Contains("bbox") || !line.Contains("x_ocr_word")) continue;
+                if (File.Exists(path))
+                {
+                    try
+                    {
+                        _cachedTypeface = SKTypeface.FromFile(path);
+                        Console.WriteLine(path);
+                        return _cachedTypeface;
+                    }
+                    catch { /* try next */ }
+                }
+            }
 
-                var bboxMatch = Regex.Match(line, @"bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)");
-                if (!bboxMatch.Success) continue;
+            // Absolute fallback
+            return _cachedTypeface = SKTypeface.Default;
+        }
 
-                var x1 = int.Parse(bboxMatch.Groups[1].Value);
-                var y1 = int.Parse(bboxMatch.Groups[2].Value);
-                var x2 = int.Parse(bboxMatch.Groups[3].Value);
-                var y2 = int.Parse(bboxMatch.Groups[4].Value);
+        // Fully fixed and improved hOCR text layer rendering
+        private static void DrawHocrText(SKCanvas canvas, string hocr, int dpi, SKTypeface typeface)
+        {
+            var wordRegex = new Regex(
+                @"<span\s+class='ocrx_word'[^>]*id='word[^>]*title='bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)[^>]*>([^<]+)</span>",
+                RegexOptions.Compiled);
 
-                var textMatch = Regex.Match(line, @">([^<]+)</span>");
-                var text = textMatch.Success ? textMatch.Groups[1].Value.Trim() : "";
+            foreach (Match match in wordRegex.Matches(hocr))
+            {
+                var x1 = int.Parse(match.Groups[1].Value);
+                var y1 = int.Parse(match.Groups[2].Value);
+                var x2 = int.Parse(match.Groups[3].Value);
+                var y2 = int.Parse(match.Groups[4].Value);
+                var rawText = match.Groups[5].Value.Trim();
 
-                if (string.IsNullOrWhiteSpace(text)) continue;
+                // Skip empty or invalid text
+                if (string.IsNullOrWhiteSpace(rawText) || rawText == " ")
+                    continue;
+
+                // Normalize Unicode for diacritics
+                var text = rawText.Normalize(NormalizationForm.FormC);
 
                 float pdfX = x1 * 72f / dpi;
-                float pdfY = y2 * 72f / dpi; // bottom of bbox = text baseline
+                float pdfY = y2 * 72f / dpi; // baseline
+                float boxHeight = (y2 - y1) * 72f / dpi;
+                float boxWidth = (x2 - x1) * 72f / dpi;
+
+                using var paint = new SKPaint
+                {
+                    // Use nearly transparent white (alpha=3) - invisible but extractable
+                    Color = new SKColor(255, 255, 255, 3),
+                    Style = SKPaintStyle.Fill,
+                    IsAntialias = false, // Disable antialiasing for cleaner extraction
+                    Typeface = typeface,
+                    TextSize = boxHeight * 0.96f,
+                    TextEncoding = SKTextEncoding.Utf8,
+                    SubpixelText = false, // Disable for invisible text
+                    LcdRenderText = false  // Disable for invisible text
+                };
+
+                // Scale text to fit bounding box width
+                float measured = paint.MeasureText(text);
+                if (measured > boxWidth && measured > 0)
+                {
+                    paint.TextSize *= (boxWidth / measured) * 0.98f;
+                }
 
                 canvas.DrawText(text, pdfX, pdfY, paint);
             }
-
-            paint.Dispose();
         }
 
         public void Dispose()
         {
             _sharedEngine?.Dispose();
+            _cachedTypeface?.Dispose();
         }
     }
 }
