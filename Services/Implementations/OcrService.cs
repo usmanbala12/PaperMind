@@ -196,11 +196,23 @@ namespace PaperMind.Services.Implementations
                         using (var skImage = SKImage.FromEncodedData(imageBytes))
                         using (var bitmap = SKBitmap.FromImage(skImage))
                         {
+                            // Draw the image filling the PDF page
                             canvas.DrawBitmap(bitmap, SKRect.Create(0, 0, (float)page.Width, (float)page.Height));
+                            
+                            // --- UPDATED CALL ---
+                            // We pass the IMAGE dimensions (pixels) and the PAGE dimensions (points)
+                            // The method will calculate the correct scaling ratio.
+                            DrawHocrText(
+                                canvas, 
+                                hocrText, 
+                                skImage.Width,        // Image Width in Pixels
+                                skImage.Height,       // Image Height in Pixels
+                                (float)page.Width,    // PDF Page Width in Points
+                                (float)page.Height,   // PDF Page Height in Points
+                                typeface, 
+                                debugMode: false       // Set to false for production
+                            );
                         }
-
-                        // Draw invisible searchable text
-                        DrawHocrText(canvas, hocrText, dpi, typeface);
 
                         skDocument.EndPage();
                         canvas.Dispose();
@@ -335,53 +347,92 @@ namespace PaperMind.Services.Implementations
         }
 
         // Fully fixed and improved hOCR text layer rendering
-        private static void DrawHocrText(SKCanvas canvas, string hocr, int dpi, SKTypeface typeface)
+        private static void DrawHocrText(
+            SKCanvas canvas,
+            string hocr,
+            float imageWidthPixels,
+            float imageHeightPixels,
+            float pdfPageWidthPoints,
+            float pdfPageHeightPoints,
+            SKTypeface typeface,
+            bool debugMode = false)
         {
+            // Calculate the ratio to map OCR pixels to PDF points
+            float scaleFactorX = pdfPageWidthPoints / imageWidthPixels;
+            float scaleFactorY = pdfPageHeightPoints / imageHeightPixels;
+
             var wordRegex = new Regex(
                 @"<span\s+class='ocrx_word'[^>]*id='word[^>]*title='bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)[^>]*>([^<]+)</span>",
                 RegexOptions.Compiled);
 
             foreach (Match match in wordRegex.Matches(hocr))
             {
-                var x1 = int.Parse(match.Groups[1].Value);
-                var y1 = int.Parse(match.Groups[2].Value);
-                var x2 = int.Parse(match.Groups[3].Value);
-                var y2 = int.Parse(match.Groups[4].Value);
-                var rawText = match.Groups[5].Value.Trim();
-
-                // Skip empty or invalid text
-                if (string.IsNullOrWhiteSpace(rawText) || rawText == " ")
+                if (!int.TryParse(match.Groups[1].Value, out int x1) ||
+                    !int.TryParse(match.Groups[2].Value, out int y1) ||
+                    !int.TryParse(match.Groups[3].Value, out int x2) ||
+                    !int.TryParse(match.Groups[4].Value, out int y2))
                     continue;
 
-                // Normalize Unicode for diacritics
+                var rawText = match.Groups[5].Value.Trim();
+                rawText = System.Net.WebUtility.HtmlDecode(rawText);
+
+                if (string.IsNullOrWhiteSpace(rawText)) continue;
+
                 var text = rawText.Normalize(NormalizationForm.FormC);
 
-                float pdfX = x1 * 72f / dpi;
-                float pdfY = y2 * 72f / dpi; // baseline
-                float boxHeight = (y2 - y1) * 72f / dpi;
-                float boxWidth = (x2 - x1) * 72f / dpi;
+                // --- COORDINATE MAPPING ---
+                // Instead of using DPI, we multiply by the scale factor
+                float pdfX1 = x1 * scaleFactorX;
+                float pdfY1 = y1 * scaleFactorY;
+                float pdfX2 = x2 * scaleFactorX;
+                float pdfY2 = y2 * scaleFactorY;
 
-                using var paint = new SKPaint
-                {
-                    // Use nearly transparent white (alpha=3) - invisible but extractable
-                    Color = new SKColor(255, 255, 255, 3),
-                    Style = SKPaintStyle.Fill,
-                    IsAntialias = false, // Disable antialiasing for cleaner extraction
-                    Typeface = typeface,
-                    TextSize = boxHeight * 0.96f,
-                    TextEncoding = SKTextEncoding.Utf8,
-                    SubpixelText = false, // Disable for invisible text
-                    LcdRenderText = false  // Disable for invisible text
-                };
+                float boxWidth = pdfX2 - pdfX1;
+                float boxHeight = pdfY2 - pdfY1;
 
-                // Scale text to fit bounding box width
-                float measured = paint.MeasureText(text);
-                if (measured > boxWidth && measured > 0)
+                if (boxWidth <= 0 || boxHeight <= 0) continue;
+
+                canvas.Save();
+
+                // --- DEBUG VISUALS ---
+                if (debugMode)
                 {
-                    paint.TextSize *= (boxWidth / measured) * 0.98f;
+                    using var borderPaint = new SKPaint
+                    {
+                        Color = SKColors.Blue,
+                        Style = SKPaintStyle.Stroke,
+                        StrokeWidth = 0.5f,
+                        IsAntialias = true
+                    };
+                    canvas.DrawRect(pdfX1, pdfY1, boxWidth, boxHeight, borderPaint);
                 }
 
-                canvas.DrawText(text, pdfX, pdfY, paint);
+                // --- TEXT RENDERING ---
+                using var textPaint = new SKPaint
+                {
+                    Color = debugMode ? new SKColor(255, 0, 0, 128) : SKColors.Transparent,
+                    Style = SKPaintStyle.Fill,
+                    IsAntialias = true,
+                    Typeface = typeface,
+                    TextSize = 100f,
+                    TextEncoding = SKTextEncoding.Utf8,
+                };
+
+                SKRect textBounds = new SKRect();
+                textPaint.MeasureText(text, ref textBounds);
+
+                if (textBounds.Width > 0 && textBounds.Height > 0)
+                {
+                    // Scale text to fit the box
+                    float textScaleX = boxWidth / textBounds.Width;
+                    float textScaleY = boxHeight / textBounds.Height;
+
+                    canvas.Translate(pdfX1, pdfY1);
+                    canvas.Scale(textScaleX, textScaleY);
+                    canvas.DrawText(text, -textBounds.Left, -textBounds.Top, textPaint);
+                }
+
+                canvas.Restore();
             }
         }
 
