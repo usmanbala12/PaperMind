@@ -20,11 +20,14 @@ namespace PaperMind.Services.Implementations
         private readonly IConfigurationService _config;
         private readonly ILoggingService _log;
         private readonly IJobRepository _repo;
+        private readonly StorageServiceFactory _storageFactory;
 
         private readonly ConcurrentDictionary<Guid, ProcessingJob> _jobs = new();
         private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _cancellations = new();
 
-        public ProcessingJobService(IOCRService ocr, ILLMService llm, IPdfProcessor pdf, IConfigurationService config, ILoggingService log, IJobRepository repo)
+        private readonly Dictionary<string, IJobStep> _availableSteps;
+
+        public ProcessingJobService(IOCRService ocr, ILLMService llm, IPdfProcessor pdf, IConfigurationService config, ILoggingService log, IJobRepository repo, StorageServiceFactory storageFactory)
         {
             _ocr = ocr;
             _llm = llm;
@@ -32,6 +35,16 @@ namespace PaperMind.Services.Implementations
             _config = config;
             _log = log;
             _repo = repo;
+            _storageFactory = storageFactory;
+
+            // Initialize steps
+            var steps = new IJobStep[]
+            {
+                new Steps.OcrStep(ocr, config),
+                new Steps.LlmRenameStep(llm, ocr, config),
+                new Steps.UploadStep(storageFactory, config)
+            };
+            _availableSteps = steps.ToDictionary(s => s.StepType);
         }
 
         public Task<ProcessingJob> CreateJobAsync(string inputFolder, string outputFolder, ProcessingStep steps)
@@ -53,6 +66,41 @@ namespace PaperMind.Services.Implementations
                 TotalFiles = 0,
                 StartTime = DateTime.UtcNow
             };
+
+            // Build pipeline JSON from legacy flags
+            var pipeline = new List<JobStepConfig>();
+
+            // Order matters here for legacy compatibility!
+            // Legacy: Rename -> OCR -> Upload
+            // Wait, legacy ProcessSingleAsync did:
+            // 1. Rename (if LlmRename)
+            // 2. OCR (if OcrToSearchablePdf)
+            // 3. Upload (if UploadToCloud)
+
+            if (steps.HasFlag(ProcessingStep.LlmRename))
+            {
+                pipeline.Add(new JobStepConfig { StepType = "LlmRename" });
+            }
+
+            if (steps.HasFlag(ProcessingStep.OcrToSearchablePdf))
+            {
+                pipeline.Add(new JobStepConfig
+                {
+                    StepType = "OcrToSearchablePdf",
+                    Parameters = new Dictionary<string, string>
+                    {
+                        ["Quality"] = job.OcrQuality.ToString(),
+                        ["Language"] = job.OcrLanguage
+                    }
+                });
+            }
+
+            if (steps.HasFlag(ProcessingStep.UploadToCloud))
+            {
+                pipeline.Add(new JobStepConfig { StepType = "UploadToCloud" });
+            }
+
+            job.PipelineJson = System.Text.Json.JsonSerializer.Serialize(pipeline);
 
             _jobs[job.JobId] = job;
             _repo.AddJob(job);
@@ -90,13 +138,6 @@ namespace PaperMind.Services.Implementations
                 var processedSet = new HashSet<string>(job.ProcessedFiles);
                 var filesToProcess = files.Where(f => !processedSet.Contains(f)).ToList();
 
-                // If we are resuming, we might have fewer files to process than TotalFiles
-                // But TotalFiles should represent the total files in the input folder ideally, 
-                // or we keep it as is. Let's update TotalFiles to reflect current reality if it changed,
-                // or just keep it. For progress calculation, we need to be careful.
-                // Let's say TotalFiles is always the count of files in the folder.
-
-                // If filesToProcess is empty but TotalFiles > 0, it means we are done.
                 if (filesToProcess.Count == 0 && files.Count > 0)
                 {
                     job.Status = JobStatus.Completed;
@@ -108,12 +149,16 @@ namespace PaperMind.Services.Implementations
                 }
 
                 int index = job.FilesProcessed; // Continue count
+                var sessionStartTime = DateTime.UtcNow;
+                int sessionProcessedCount = 0;
+
                 foreach (var path in filesToProcess)
                 {
                     token.ThrowIfCancellationRequested();
 
                     index++;
-                    _log.Info($"[Job {job.JobId}] Processing ({index}/{job.TotalFiles}): {Path.GetFileName(path)}");
+                    job.CurrentFile = Path.GetFileName(path);
+                    _log.Info($"[Job {job.JobId}] Processing ({index}/{job.TotalFiles}): {job.CurrentFile}");
 
                     // Remove any existing error for this file since we are retrying it
                     job.Errors.RemoveAll(e => e.FilePath == path);
@@ -133,7 +178,21 @@ namespace PaperMind.Services.Implementations
                             job.ProcessedFiles.Add(path);
 
                             job.FilesProcessed++;
+                            sessionProcessedCount++;
                             job.Progress = job.TotalFiles > 0 ? (double)job.FilesProcessed / job.TotalFiles : 1d;
+
+                            // Calculate metrics
+                            var elapsedMinutes = (DateTime.UtcNow - sessionStartTime).TotalMinutes;
+                            if (elapsedMinutes > 0)
+                            {
+                                job.Throughput = sessionProcessedCount / elapsedMinutes;
+                                var remainingFiles = job.TotalFiles - job.FilesProcessed;
+                                if (job.Throughput > 0)
+                                {
+                                    job.EstimatedTimeRemaining = TimeSpan.FromMinutes(remainingFiles / job.Throughput);
+                                }
+                            }
+
                             _repo.UpdateJob(job);
                             break; // Success, exit retry loop
                         }
@@ -174,6 +233,11 @@ namespace PaperMind.Services.Implementations
                 {
                     job.Status = JobStatus.Completed;
                 }
+
+                // Clear transient metrics on completion
+                job.CurrentFile = string.Empty;
+                job.EstimatedTimeRemaining = null;
+                job.Throughput = 0;
             }
             catch (OperationCanceledException)
             {
@@ -198,69 +262,61 @@ namespace PaperMind.Services.Implementations
             // Ensure we respect cancellation between steps
             token.ThrowIfCancellationRequested();
 
-            // Determine naming if needed
-            string? newName = null;
-            if (job.Steps.HasFlag(ProcessingStep.LlmRename))
+            // Prepare pipeline
+            List<JobStepConfig> pipeline;
+            if (!string.IsNullOrWhiteSpace(job.PipelineJson))
             {
-                var textForNaming = await SafeExtractTextForNamingAsync(inputPath, job).ConfigureAwait(false);
-                var prompt = _config.Get("LLM_PROMPT") ?? "Generate filename";
-                newName = await _llm.GenerateAsync(prompt, textForNaming).ConfigureAwait(false);
-                if (string.IsNullOrWhiteSpace(newName))
+                try
                 {
-                    newName = $"Document_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+                    pipeline = System.Text.Json.JsonSerializer.Deserialize<List<JobStepConfig>>(job.PipelineJson)
+                               ?? new List<JobStepConfig>();
+                }
+                catch
+                {
+                    _log.Warn($"Failed to deserialize pipeline for job {job.JobId}. Falling back to empty.");
+                    pipeline = new List<JobStepConfig>();
                 }
             }
             else
             {
-                newName = Path.GetFileName(inputPath);
+                // Fallback if no JSON (shouldn't happen for new jobs, but maybe old ones)
+                // We could reconstruct from flags here if needed, but let's assume migration handles it or we just skip.
+                pipeline = new List<JobStepConfig>();
             }
 
-            var destinationPath = Path.Combine(job.OutputFolder, newName!);
-            destinationPath = EnsureUniquePath(destinationPath);
+            // Setup context
+            // IMPORTANT: We need to copy the input file to the output folder (or a temp working dir) 
+            // so we don't modify the source file in the InputFolder.
+            // The legacy logic did: File.Copy(inputPath, destinationPath) inside the steps.
+            // But our steps assume they work on context.CurrentFilePath.
 
-            // OCR to searchable PDF
-            if (job.Steps.HasFlag(ProcessingStep.OcrToSearchablePdf))
+            // Let's copy to a temp working file first.
+            var workingFile = Path.Combine(job.OutputFolder, Path.GetFileName(inputPath));
+            workingFile = EnsureUniquePath(workingFile);
+            File.Copy(inputPath, workingFile, overwrite: true);
+
+            var context = new JobContext(job, workingFile, _log);
+
+            foreach (var stepConfig in pipeline)
             {
-                var cfg = new OcrConfig
-                {
-                    OutputSearchablePdfPath = destinationPath,
-                    Quality = job.OcrQuality,
-                    Language = job.OcrLanguage,
-                    Sampling = PageSamplingStrategy.All,
-                    MaxThreadsPerEngine = _config.Get("OCR_THREADS", 1)
-                };
+                token.ThrowIfCancellationRequested();
 
-                var res = await _ocr.ProcessPdfAsync(inputPath, cfg).ConfigureAwait(false);
-                if (!res.Success || string.IsNullOrWhiteSpace(res.OutputPath) || !File.Exists(res.OutputPath))
+                if (_availableSteps.TryGetValue(stepConfig.StepType, out var step))
                 {
-                    // Fallback: copy original
-                    File.Copy(inputPath, destinationPath, overwrite: false);
+                    try
+                    {
+                        await step.ExecuteAsync(context, stepConfig).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.Error($"Step {stepConfig.StepType} failed for {context.CurrentFilePath}", ex);
+                        throw; // Re-throw to trigger retry logic
+                    }
                 }
-            }
-            else
-            {
-                // No OCR; just copy file (possibly renamed)
-                File.Copy(inputPath, destinationPath, overwrite: false);
-            }
-
-            // Upload to cloud (Phase 2)
-            if (job.Steps.HasFlag(ProcessingStep.UploadToCloud))
-            {
-                _log.Info($"[Job {job.JobId}] UploadToCloud selected. TODO: implement cloud upload in phase 2 for {destinationPath}.");
-            }
-        }
-
-        private async Task<string> SafeExtractTextForNamingAsync(string path, ProcessingJob job)
-        {
-            try
-            {
-                // For naming text, we use OCR extraction to keep it generic (works for scanned and text-backed PDFs)
-                return await _ocr.ExtractTextAsync(path, job.OcrQuality, job.OcrLanguage).ConfigureAwait(false) ?? string.Empty;
-            }
-            catch (Exception ex)
-            {
-                _log.Warn($"Text extraction for naming failed: {ex.Message}");
-                return string.Empty;
+                else
+                {
+                    _log.Warn($"Unknown step type: {stepConfig.StepType}");
+                }
             }
         }
 

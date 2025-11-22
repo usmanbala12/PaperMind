@@ -1,6 +1,8 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="PaperMind.Views.SettingsView">
+             xmlns:vm="using:PaperMind.ViewModels"
+             x:Class="PaperMind.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
   
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Margin="16" Spacing="16" MaxWidth="800">
@@ -94,11 +96,102 @@
         </StackPanel>
       </Border>
 
+      <!-- Cloud Storage Settings -->
+      <Border Background="White" BorderBrush="#E1E4E8" BorderThickness="1" CornerRadius="8" Padding="16">
+        <StackPanel Spacing="12">
+          <TextBlock Text="Cloud Storage" FontSize="16" FontWeight="SemiBold"/>
+          
+          <StackPanel Spacing="8">
+            <TextBlock Text="Storage Provider" FontWeight="Medium"/>
+            <ComboBox Width="250" HorizontalAlignment="Left" 
+                      ItemsSource="{Binding AvailableStorageProviders}"
+                      SelectedItem="{Binding StorageProvider}"/>
+          </StackPanel>
+
+          <!-- Google Drive Settings -->
+          <StackPanel Spacing="12" IsVisible="{Binding IsGoogleDriveSelected}">
+            <TextBlock Text="Google Drive Configuration" FontWeight="SemiBold" FontSize="14" Margin="0,8,0,0"/>
+            
+            <StackPanel Spacing="8">
+              <TextBlock Text="Client ID" FontWeight="Medium"/>
+              <TextBox Width="450" HorizontalAlignment="Left" Text="{Binding GoogleDriveClientId}" PasswordChar="*"/>
+            </StackPanel>
+            
+            <StackPanel Spacing="8">
+              <TextBlock Text="Client Secret" FontWeight="Medium"/>
+              <TextBox Width="450" HorizontalAlignment="Left" Text="{Binding GoogleDriveClientSecret}" PasswordChar="*"/>
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+              <TextBlock Text="Folder ID (Optional)" FontWeight="Medium"/>
+              <TextBox Width="350" HorizontalAlignment="Left" Text="{Binding GoogleDriveFolderId}" Watermark="Leave empty for root"/>
+              <TextBlock Text="The ID of the folder to upload to (from URL)" FontSize="11" Foreground="#6A737D"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Content="Connect to Google Drive" Command="{Binding ConnectGoogleDriveCommand}" IsEnabled="{Binding !IsGoogleDriveConnected}"/>
+                <TextBlock Text="Connected" Foreground="Green" VerticalAlignment="Center" IsVisible="{Binding IsGoogleDriveConnected}"/>
+            </StackPanel>
+          </StackPanel>
+
+          <!-- Dropbox Settings -->
+          <StackPanel Spacing="12" IsVisible="{Binding IsDropboxSelected}">
+            <TextBlock Text="Dropbox Configuration" FontWeight="SemiBold" FontSize="14" Margin="0,8,0,0"/>
+            
+            <StackPanel Spacing="8">
+              <TextBlock Text="App Key" FontWeight="Medium"/>
+              <TextBox Width="450" HorizontalAlignment="Left" Text="{Binding DropboxAppKey}" PasswordChar="*"/>
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+              <TextBlock Text="Access Token" FontWeight="Medium"/>
+              <TextBox Width="450" HorizontalAlignment="Left" Text="{Binding DropboxAccessToken}" PasswordChar="*"/>
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+              <TextBlock Text="Folder Path (Optional)" FontWeight="Medium"/>
+              <TextBox Width="350" HorizontalAlignment="Left" Text="{Binding DropboxFolderPath}" Watermark="/PaperMind"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Content="Connect to Dropbox" Command="{Binding ConnectDropboxCommand}" IsEnabled="{Binding !IsDropboxConnected}"/>
+                <TextBlock Text="Connected" Foreground="Green" VerticalAlignment="Center" IsVisible="{Binding IsDropboxConnected}"/>
+            </StackPanel>
+          </StackPanel>
+
+          <!-- OneDrive Settings -->
+          <StackPanel Spacing="12" IsVisible="{Binding IsOneDriveSelected}">
+            <TextBlock Text="OneDrive Configuration" FontWeight="SemiBold" FontSize="14" Margin="0,8,0,0"/>
+            
+            <StackPanel Spacing="8">
+              <TextBlock Text="Client ID" FontWeight="Medium"/>
+              <TextBox Width="450" HorizontalAlignment="Left" Text="{Binding OneDriveClientId}" PasswordChar="*"/>
+            </StackPanel>
+            
+            <StackPanel Spacing="8">
+              <TextBlock Text="Tenant ID" FontWeight="Medium"/>
+              <TextBox Width="450" HorizontalAlignment="Left" Text="{Binding OneDriveTenantId}" PasswordChar="*"/>
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+              <TextBlock Text="Folder Path (Optional)" FontWeight="Medium"/>
+              <TextBox Width="350" HorizontalAlignment="Left" Text="{Binding OneDriveFolderPath}" Watermark="/PaperMind"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Content="Connect to OneDrive" Command="{Binding ConnectOneDriveCommand}" IsEnabled="{Binding !IsOneDriveConnected}"/>
+                <TextBlock Text="Connected" Foreground="Green" VerticalAlignment="Center" IsVisible="{Binding IsOneDriveConnected}"/>
+            </StackPanel>
+          </StackPanel>
+
+        </StackPanel>
+      </Border>
+
       <!-- Action Buttons -->
       <StackPanel Orientation="Horizontal" Spacing="12">
-        <Button Content="Save Settings" Width="120" 
+        <Button Content="Save Settings" Command="{Binding SaveCommand}" Width="120" 
                 Background="#28a745" Foreground="White" Padding="8"/>
-        <Button Content="Reset" Width="100" Padding="8"/>
+        <Button Content="Reset" Command="{Binding ResetCommand}" Width="100" Padding="8"/>
       </StackPanel>
     </StackPanel>
   </ScrollViewer>

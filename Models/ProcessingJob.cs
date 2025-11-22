@@ -28,5 +28,13 @@ namespace PaperMind.Models
 
         // Track successfully processed files to skip on resume
         public System.Collections.Generic.HashSet<string> ProcessedFiles { get; set; } = new();
+
+        // Transient metrics (not persisted)
+        public string CurrentFile { get; set; } = string.Empty;
+        public double Throughput { get; set; } // Files per minute
+        public TimeSpan? EstimatedTimeRemaining { get; set; }
+
+        // Pipeline support
+        public string? PipelineJson { get; set; }
     }
 }

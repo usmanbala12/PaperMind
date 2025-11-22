@@ -24,5 +24,16 @@ namespace PaperMind.Models
         public FallbackNamingStrategy FallbackNamingStrategy { get; set; } = FallbackNamingStrategy.ContentTitle;
 
         public LogLevel LogLevel { get; set; } = LogLevel.Information;
+
+        public StorageProvider StorageProvider { get; set; } = StorageProvider.Local;
+
+        public StorageConfig StorageConfig { get; set; } = new StorageConfig();
+    }
+
+    public class StorageConfig
+    {
+        public string GoogleDriveFolderId { get; set; } = string.Empty;
+        public string DropboxFolderPath { get; set; } = string.Empty;
+        public string OneDriveFolderPath { get; set; } = string.Empty;
     }
 }

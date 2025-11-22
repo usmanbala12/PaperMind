@@ -21,6 +21,10 @@ namespace PaperMind.ViewModels
         private string _statusText = "";
         private JobStatus _lastKnownStatus = JobStatus.Pending;
 
+        private string _currentFile = "";
+        private string _throughput = "";
+        private string _estimatedTimeRemaining = "";
+
         public JobViewModel(IProcessingJobService jobsService, ProcessingJob job, Action? navigateBack = null)
         {
             _jobs = jobsService;
@@ -79,6 +83,24 @@ namespace PaperMind.ViewModels
             private set => this.RaiseAndSetIfChanged(ref _statusText, value);
         }
 
+        public string CurrentFile
+        {
+            get => _currentFile;
+            private set => this.RaiseAndSetIfChanged(ref _currentFile, value);
+        }
+
+        public string Throughput
+        {
+            get => _throughput;
+            private set => this.RaiseAndSetIfChanged(ref _throughput, value);
+        }
+
+        public string EstimatedTimeRemaining
+        {
+            get => _estimatedTimeRemaining;
+            private set => this.RaiseAndSetIfChanged(ref _estimatedTimeRemaining, value);
+        }
+
         public ObservableCollection<string> Logs { get; }
         public ObservableCollection<FileProcessingError> Errors { get; }
 
@@ -114,6 +136,12 @@ namespace PaperMind.ViewModels
 
             StatusText = GetStatusDisplayText(j.Status);
             ProgressPercent = Math.Clamp(j.Progress * 100.0, 0, 100);
+
+            CurrentFile = j.CurrentFile;
+            Throughput = j.Throughput > 0 ? $"{j.Throughput:F1} files/min" : "-";
+            EstimatedTimeRemaining = j.EstimatedTimeRemaining.HasValue
+                ? j.EstimatedTimeRemaining.Value.ToString(@"hh\:mm\:ss")
+                : "-";
 
             // Only log on actual status change or meaningful progress
             if (addLog && statusChanged)
@@ -156,8 +184,12 @@ namespace PaperMind.ViewModels
             this.RaisePropertyChanged(nameof(FilesProcessed));
             this.RaisePropertyChanged(nameof(TotalFiles));
             this.RaisePropertyChanged(nameof(ProgressPercent));
+            this.RaisePropertyChanged(nameof(ProgressPercent));
             this.RaisePropertyChanged(nameof(StatusText));
             this.RaisePropertyChanged(nameof(ShowBlankLogs));
+            this.RaisePropertyChanged(nameof(CurrentFile));
+            this.RaisePropertyChanged(nameof(Throughput));
+            this.RaisePropertyChanged(nameof(EstimatedTimeRemaining));
         }
 
         private string GetStatusDisplayText(JobStatus status) => status switch

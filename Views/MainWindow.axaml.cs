@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PaperMind;
 using PaperMind.Models;
 using PaperMind.Services.Abstractions;
+using PaperMind.Services.Implementations;
 using PaperMind.ViewModels;
 
 namespace PaperMind.Views
@@ -11,7 +12,7 @@ namespace PaperMind.Views
     public partial class MainWindow : Window
     {
         private const string SelectedJobIdKey = "SelectedJobId";
-        
+
         private JobsView? _jobsView;
         private JobsViewModel? _jobsVm;
         private JobView? _jobView;
@@ -38,6 +39,7 @@ namespace PaperMind.Views
             var configService = App.Services.GetRequiredService<IConfigurationService>();
             var credentialService = App.Services.GetRequiredService<ICredentialService>();
             var loggingService = App.Services.GetRequiredService<ILoggingService>();
+            var storageFactory = App.Services.GetRequiredService<StorageServiceFactory>();
 
             // Find tab hosts from XAML
             _mainTabs = this.FindControl<TabControl>("MainTabs");
@@ -55,7 +57,7 @@ namespace PaperMind.Views
             }
 
             // Initialize Settings tab content
-            _settingsVm = new SettingsViewModel(configService, credentialService, loggingService);
+            _settingsVm = new SettingsViewModel(configService, credentialService, loggingService, storageFactory);
             _settingsView = new SettingsView { DataContext = _settingsVm };
             if (_settingsTabHost is not null)
             {
@@ -110,10 +112,10 @@ namespace PaperMind.Views
         {
             var jobService = App.Services.GetRequiredService<IProcessingJobService>();
             var configService = App.Services.GetRequiredService<IConfigurationService>();
-            
+
             // Persist the selected job ID
             configService.Set(SelectedJobIdKey, job.JobId.ToString());
-            
+
             _jobVm?.Dispose();
             _jobVm = new JobViewModel(jobService, job, navigateBack: ShowJobsList);
             _jobView = new JobView { DataContext = _jobVm };

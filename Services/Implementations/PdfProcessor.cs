@@ -11,7 +11,6 @@ using PaperMind.Models.Ocr;
 using PaperMind.Services.Abstractions;
 using PdfPigDocument = UglyToad.PdfPig.PdfDocument;
 using PdfPigPage = UglyToad.PdfPig.Content.Page;
-using PaperMind.Services.Abstractions;
 
 namespace PaperMind.Services.Implementations
 {

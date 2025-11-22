@@ -31,6 +31,13 @@ public partial class App : Application
         services.AddSingleton<IBatchProcessor, BatchProcessor>();
         services.AddSingleton<ITessdataService, TessdataService>();
 
+        // Storage Services
+        services.AddSingleton<LocalStorageService>();
+        services.AddSingleton<GoogleDriveStorageService>();
+        services.AddSingleton<DropboxStorageService>();
+        services.AddSingleton<OneDriveStorageService>();
+        services.AddSingleton<StorageServiceFactory>();
+
         // SQLite-backed jobs repository
         services.AddSingleton<IJobRepository>(sp =>
         {

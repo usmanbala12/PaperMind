@@ -33,3 +33,5 @@ Thumbs.db
 
 build_*.txt
 restore_*.txt
+msbuild.log.txt
+msbuild_auth.log.txt

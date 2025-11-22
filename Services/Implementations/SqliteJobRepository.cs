@@ -47,7 +47,8 @@ namespace PaperMind.Services.Implementations
                     StartTime TEXT NOT NULL,
                     EndTime TEXT NULL,
                     OcrQuality INTEGER NOT NULL,
-                    OcrLanguage TEXT NOT NULL
+                    OcrLanguage TEXT NOT NULL,
+                    PipelineJson TEXT NULL
                 );
                 
                 CREATE TABLE IF NOT EXISTS JobFileStatus (
@@ -59,6 +60,15 @@ namespace PaperMind.Services.Implementations
                     PRIMARY KEY (JobId, FilePath)
                 );";
             cmd.ExecuteNonQuery();
+            
+            // Migration: Add PipelineJson if missing
+            try 
+            {
+                using var cmdAlter = conn.CreateCommand();
+                cmdAlter.CommandText = "ALTER TABLE Jobs ADD COLUMN PipelineJson TEXT NULL;";
+                cmdAlter.ExecuteNonQuery();
+            }
+            catch { /* Ignore if exists */ }
         }
 
         public void AddJob(ProcessingJob job)
@@ -69,10 +79,10 @@ namespace PaperMind.Services.Implementations
             cmd.CommandText = @"
                 INSERT INTO Jobs (
                     JobId, InputFolder, OutputFolder, Steps, Status, Progress,
-                    FilesProcessed, TotalFiles, StartTime, EndTime, OcrQuality, OcrLanguage
+                    FilesProcessed, TotalFiles, StartTime, EndTime, OcrQuality, OcrLanguage, PipelineJson
                 ) VALUES (
                     @JobId, @InputFolder, @OutputFolder, @Steps, @Status, @Progress,
-                    @FilesProcessed, @TotalFiles, @StartTime, @EndTime, @OcrQuality, @OcrLanguage
+                    @FilesProcessed, @TotalFiles, @StartTime, @EndTime, @OcrQuality, @OcrLanguage, @PipelineJson
                 );";
 
             BindAll(cmd, job);
@@ -96,7 +106,8 @@ namespace PaperMind.Services.Implementations
                     StartTime = @StartTime,
                     EndTime = @EndTime,
                     OcrQuality = @OcrQuality,
-                    OcrLanguage = @OcrLanguage
+                    OcrLanguage = @OcrLanguage,
+                    PipelineJson = @PipelineJson
                 WHERE JobId = @JobId;";
 
             BindAll(cmd, job);
@@ -216,6 +227,7 @@ namespace PaperMind.Services.Implementations
 
             cmd.Parameters.Add(new SqliteParameter("@OcrQuality", SqliteType.Integer) { Value = (int)job.OcrQuality });
             cmd.Parameters.Add(new SqliteParameter("@OcrLanguage", SqliteType.Text) { Value = job.OcrLanguage });
+            cmd.Parameters.Add(new SqliteParameter("@PipelineJson", SqliteType.Text) { Value = (object?)job.PipelineJson ?? DBNull.Value });
         }
 
         private static ProcessingJob Map(SqliteDataReader r)
@@ -235,7 +247,8 @@ namespace PaperMind.Services.Implementations
                     ? null
                     : DateTime.Parse(r.GetString(r.GetOrdinal("EndTime")), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
                 OcrQuality = (OcrQuality)r.GetInt32(r.GetOrdinal("OcrQuality")),
-                OcrLanguage = r.GetString(r.GetOrdinal("OcrLanguage"))
+                OcrLanguage = r.GetString(r.GetOrdinal("OcrLanguage")),
+                PipelineJson = r.IsDBNull(r.GetOrdinal("PipelineJson")) ? null : r.GetString(r.GetOrdinal("PipelineJson"))
             };
         }
     }

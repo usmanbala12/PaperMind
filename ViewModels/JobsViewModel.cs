@@ -22,11 +22,22 @@ namespace PaperMind.ViewModels
 
         private string _inputFolder = string.Empty;
         private string _outputFolder = string.Empty;
-        private bool _stepOcrToSearchablePdf = true;
-        private bool _stepLlmRename = true;
-        private bool _stepUploadToCloud = false;
-        private string _ocrLanguage = "eng";
-        private OcrQuality _ocrQuality = OcrQuality.Balanced;
+
+        // Pipeline
+        public ObservableCollection<JobStepViewModel> PipelineSteps { get; } = new();
+        public ObservableCollection<string> AvailableStepTypes { get; } = new()
+        {
+            "OcrToSearchablePdf",
+            "LlmRename",
+            "UploadToCloud"
+        };
+
+        private string _selectedStepTypeToAdd = "OcrToSearchablePdf";
+        public string SelectedStepTypeToAdd
+        {
+            get => _selectedStepTypeToAdd;
+            set => this.RaiseAndSetIfChanged(ref _selectedStepTypeToAdd, value);
+        }
 
         public JobsViewModel(IProcessingJobService jobsService, Action<ProcessingJob> navigateToJob)
         {
@@ -34,8 +45,6 @@ namespace PaperMind.ViewModels
             _navigateToJob = navigateToJob ?? throw new ArgumentNullException(nameof(navigateToJob));
 
             Jobs = new ObservableCollection<ProcessingJob>(_jobsService.GetAllJobs());
-            AvailableLanguages = new ObservableCollection<string> { "eng", "fra", "deu", "spa" };
-            AvailableQualities = new ObservableCollection<OcrQuality>(Enum.GetValues<OcrQuality>());
 
             SelectInputFolderCommand = ReactiveCommand.CreateFromTask(SelectInputFolderAsync);
             SelectOutputFolderCommand = ReactiveCommand.CreateFromTask(SelectOutputFolderAsync);
@@ -43,6 +52,11 @@ namespace PaperMind.ViewModels
             SaveJobCommand = ReactiveCommand.CreateFromTask(SaveJobAsync, this.WhenAnyValue(x => x.CanSave));
             StartJobCommand = ReactiveCommand.CreateFromTask(StartJobAsync, this.WhenAnyValue(x => x.CanStart));
             OpenJobCommand = ReactiveCommand.Create<ProcessingJob>(job => _navigateToJob(job));
+
+            AddStepCommand = ReactiveCommand.Create(AddStep);
+            RemoveStepCommand = ReactiveCommand.Create<JobStepViewModel>(RemoveStep);
+            MoveStepUpCommand = ReactiveCommand.Create<JobStepViewModel>(MoveStepUp);
+            MoveStepDownCommand = ReactiveCommand.Create<JobStepViewModel>(MoveStepDown);
 
             // Fix CanSave/CanStart not updating
             this.WhenAnyValue(x => x.InputFolder, x => x.OutputFolder)
@@ -52,26 +66,20 @@ namespace PaperMind.ViewModels
                     this.RaisePropertyChanged(nameof(CanStart));
                 });
 
+            // Default steps
+            AddStep("OcrToSearchablePdf");
+
             this.RaisePropertyChanged(nameof(CanSave));
             this.RaisePropertyChanged(nameof(CanStart));
         }
 
-        // ... properties unchanged ...
-
         public string InputFolder { get => _inputFolder; set => this.RaiseAndSetIfChanged(ref _inputFolder, value); }
         public string OutputFolder { get => _outputFolder; set => this.RaiseAndSetIfChanged(ref _outputFolder, value); }
-        public bool StepOcrToSearchablePdf { get => _stepOcrToSearchablePdf; set => this.RaiseAndSetIfChanged(ref _stepOcrToSearchablePdf, value); }
-        public bool StepLlmRename { get => _stepLlmRename; set => this.RaiseAndSetIfChanged(ref _stepLlmRename, value); }
-        public bool StepUploadToCloud { get => _stepUploadToCloud; set => this.RaiseAndSetIfChanged(ref _stepUploadToCloud, value); }
-        public string OcrLanguage { get => _ocrLanguage; set => this.RaiseAndSetIfChanged(ref _ocrLanguage, value); }
-        public OcrQuality OcrQuality { get => _ocrQuality; set => this.RaiseAndSetIfChanged(ref _ocrQuality, value); }
 
         public bool CanSave => !string.IsNullOrWhiteSpace(InputFolder) && !string.IsNullOrWhiteSpace(OutputFolder);
         public bool CanStart => CanSave;
 
         public ObservableCollection<ProcessingJob> Jobs { get; }
-        public ObservableCollection<string> AvailableLanguages { get; }
-        public ObservableCollection<OcrQuality> AvailableQualities { get; }
 
         public ICommand SelectInputFolderCommand { get; }
         public ICommand SelectOutputFolderCommand { get; }
@@ -79,6 +87,11 @@ namespace PaperMind.ViewModels
         public ICommand SaveJobCommand { get; }
         public ICommand StartJobCommand { get; }
         public ICommand OpenJobCommand { get; }
+
+        public ICommand AddStepCommand { get; }
+        public ICommand RemoveStepCommand { get; }
+        public ICommand MoveStepUpCommand { get; }
+        public ICommand MoveStepDownCommand { get; }
 
         public ProcessingJob? SelectedJob
         {
@@ -92,13 +105,35 @@ namespace PaperMind.ViewModels
         }
         private ProcessingJob? _selectedJob;
 
-        private ProcessingStep ComposeSteps()
+        private void AddStep() => AddStep(SelectedStepTypeToAdd);
+
+        private void AddStep(string type)
         {
-            ProcessingStep steps = ProcessingStep.None;
-            if (StepOcrToSearchablePdf) steps |= ProcessingStep.OcrToSearchablePdf;
-            if (StepLlmRename) steps |= ProcessingStep.LlmRename;
-            if (StepUploadToCloud) steps |= ProcessingStep.UploadToCloud;
-            return steps;
+            var config = new JobStepConfig { StepType = type };
+            PipelineSteps.Add(new JobStepViewModel(config));
+        }
+
+        private void RemoveStep(JobStepViewModel step)
+        {
+            PipelineSteps.Remove(step);
+        }
+
+        private void MoveStepUp(JobStepViewModel step)
+        {
+            var index = PipelineSteps.IndexOf(step);
+            if (index > 0)
+            {
+                PipelineSteps.Move(index, index - 1);
+            }
+        }
+
+        private void MoveStepDown(JobStepViewModel step)
+        {
+            var index = PipelineSteps.IndexOf(step);
+            if (index < PipelineSteps.Count - 1)
+            {
+                PipelineSteps.Move(index, index + 1);
+            }
         }
 
         private async Task SelectInputFolderAsync()
@@ -142,13 +177,15 @@ namespace PaperMind.ViewModels
 
         private async Task SaveJobAsync()
         {
-            var job = await _jobsService.CreateJobAsync(InputFolder, OutputFolder, ComposeSteps());
+            // Create job with NO legacy steps flags (or minimal)
+            var job = await _jobsService.CreateJobAsync(InputFolder, OutputFolder, ProcessingStep.None);
 
-            // Always marshal UI updates back to the UI thread
+            // Set pipeline JSON directly
+            var pipeline = PipelineSteps.Select(vm => vm.GetConfig()).ToList();
+            job.PipelineJson = System.Text.Json.JsonSerializer.Serialize(pipeline);
+
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                job.OcrLanguage = OcrLanguage;
-                job.OcrQuality = OcrQuality;
                 RefreshJobs();
                 _navigateToJob(job);
             });
@@ -156,12 +193,14 @@ namespace PaperMind.ViewModels
 
         private async Task StartJobAsync()
         {
-            var job = await _jobsService.CreateJobAsync(InputFolder, OutputFolder, ComposeSteps());
+            var job = await _jobsService.CreateJobAsync(InputFolder, OutputFolder, ProcessingStep.None);
+
+            // Set pipeline
+            var pipeline = PipelineSteps.Select(vm => vm.GetConfig()).ToList();
+            job.PipelineJson = System.Text.Json.JsonSerializer.Serialize(pipeline);
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                job.OcrLanguage = OcrLanguage;
-                job.OcrQuality = OcrQuality;
                 RefreshJobs();
                 _navigateToJob(job);
             });
@@ -175,7 +214,6 @@ namespace PaperMind.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    // At minimum log it — or publish to a global error handler
                     Console.WriteLine($"Job failed: {ex}");
                 }
             });

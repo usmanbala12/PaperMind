@@ -37,8 +37,31 @@
         <StackPanel Spacing="8">
           <TextBlock Text="Progress" FontWeight="SemiBold"/>
           <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" Height="14"/>
-          <TextBlock Text="{Binding FilesProcessed}"/>
-          <TextBlock Text="{Binding TotalFiles}"/>
+          
+          <Grid ColumnDefinitions="Auto,*" Margin="0,4,0,0">
+             <TextBlock Text="Processed:" Foreground="#586069"/>
+             <TextBlock Grid.Column="1" Text="{Binding FilesProcessed, StringFormat='{}{0} files'}" HorizontalAlignment="Right"/>
+          </Grid>
+          
+          <Grid ColumnDefinitions="Auto,*" Margin="0,4,0,0">
+             <TextBlock Text="Total:" Foreground="#586069"/>
+             <TextBlock Grid.Column="1" Text="{Binding TotalFiles, StringFormat='{}{0} files'}" HorizontalAlignment="Right"/>
+          </Grid>
+
+          <Separator Height="1" Background="#E1E4E8" Margin="0,8"/>
+
+          <TextBlock Text="Current File:" Foreground="#586069" FontSize="12"/>
+          <TextBlock Text="{Binding CurrentFile}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding CurrentFile}" FontSize="12"/>
+
+          <Grid ColumnDefinitions="Auto,*" Margin="0,8,0,0">
+             <TextBlock Text="Speed:" Foreground="#586069" FontSize="12"/>
+             <TextBlock Grid.Column="1" Text="{Binding Throughput}" HorizontalAlignment="Right" FontSize="12"/>
+          </Grid>
+
+          <Grid ColumnDefinitions="Auto,*">
+             <TextBlock Text="Est. Remaining:" Foreground="#586069" FontSize="12"/>
+             <TextBlock Grid.Column="1" Text="{Binding EstimatedTimeRemaining}" HorizontalAlignment="Right" FontSize="12"/>
+          </Grid>
         </StackPanel>
       </Border>
       <Border Grid.Column="1" Background="White" CornerRadius="8" BorderBrush="#E1E4E8" BorderThickness="1" Padding="0">
