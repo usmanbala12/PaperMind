@@ -348,6 +348,39 @@ namespace PaperMind.Services.Implementations
             return _repo.GetAllJobs();
         }
 
+        public Task UpdateJobAsync(ProcessingJob job)
+        {
+            if (job is null) throw new ArgumentNullException(nameof(job));
+
+            // Only allow updates if job is pending
+            if (job.Status != JobStatus.Pending)
+            {
+                throw new InvalidOperationException("Only pending jobs can be updated.");
+            }
+
+            _jobs[job.JobId] = job;
+            _repo.UpdateJob(job);
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteJobAsync(Guid jobId)
+        {
+            // If running, cancel first? Or just forbid?
+            // Let's forbid deleting running jobs for safety, or cancel them.
+            // For now, let's just remove.
+
+            if (_cancellations.TryGetValue(jobId, out var cts))
+            {
+                cts.Cancel();
+                cts.Dispose();
+                _cancellations.TryRemove(jobId, out _);
+            }
+
+            _jobs.TryRemove(jobId, out _);
+            _repo.DeleteJob(jobId);
+            return Task.CompletedTask;
+        }
+
         private static string EnsureUniquePath(string path)
         {
             if (!File.Exists(path)) return path;

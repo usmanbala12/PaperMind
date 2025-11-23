@@ -60,9 +60,9 @@ namespace PaperMind.Services.Implementations
                     PRIMARY KEY (JobId, FilePath)
                 );";
             cmd.ExecuteNonQuery();
-            
+
             // Migration: Add PipelineJson if missing
-            try 
+            try
             {
                 using var cmdAlter = conn.CreateCommand();
                 cmdAlter.CommandText = "ALTER TABLE Jobs ADD COLUMN PipelineJson TEXT NULL;";
@@ -250,6 +250,34 @@ namespace PaperMind.Services.Implementations
                 OcrLanguage = r.GetString(r.GetOrdinal("OcrLanguage")),
                 PipelineJson = r.IsDBNull(r.GetOrdinal("PipelineJson")) ? null : r.GetString(r.GetOrdinal("PipelineJson"))
             };
+        }
+        public void DeleteJob(Guid jobId)
+        {
+            using var conn = new SqliteConnection(_connectionString);
+            conn.Open();
+            using var transaction = conn.BeginTransaction();
+
+            try
+            {
+                using var cmdFiles = conn.CreateCommand();
+                cmdFiles.Transaction = transaction;
+                cmdFiles.CommandText = "DELETE FROM JobFileStatus WHERE JobId = @JobId";
+                cmdFiles.Parameters.Add(new SqliteParameter("@JobId", SqliteType.Text) { Value = jobId.ToString() });
+                cmdFiles.ExecuteNonQuery();
+
+                using var cmdJob = conn.CreateCommand();
+                cmdJob.Transaction = transaction;
+                cmdJob.CommandText = "DELETE FROM Jobs WHERE JobId = @JobId";
+                cmdJob.Parameters.Add(new SqliteParameter("@JobId", SqliteType.Text) { Value = jobId.ToString() });
+                cmdJob.ExecuteNonQuery();
+
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
     }
 }

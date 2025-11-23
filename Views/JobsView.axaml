@@ -14,9 +14,11 @@
       <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="16">
           <StackPanel Spacing="4">
-            <TextBlock Text="Create Processing Job" FontSize="20" FontWeight="Bold"/>
+            <TextBlock Text="{Binding HeaderText}" FontSize="20" FontWeight="Bold"/>
             <TextBlock Text="Select folders, steps and save or start" Foreground="#6A737D"/>
           </StackPanel>
+
+          <Button Content="Cancel Edit" Command="{Binding CancelEditCommand}" IsVisible="{Binding IsEditing}" Background="#DC3545" Foreground="White" HorizontalAlignment="Right" Margin="0,-40,0,0"/>
 
           <Separator Background="#E1E4E8" Height="1"/>
 
@@ -114,12 +116,10 @@
             </ItemsControl>
           </StackPanel>
 
-          <!-- OCR Options moved to step config -->
-
           <!-- Actions -->
           <StackPanel Spacing="8">
-            <Button Content="💾 Save Job" Command="{Binding SaveJobCommand}" IsEnabled="{Binding CanSave}" Height="40" CornerRadius="6" Background="#6f42c1" Foreground="White"/>
-            <Button Content="▶️ Start Job" Command="{Binding StartJobCommand}" IsEnabled="{Binding CanStart}" Height="44" CornerRadius="6" Background="#28A745" Foreground="White"/>
+            <Button Content="{Binding CreateButtonText}" Command="{Binding SaveJobCommand}" IsEnabled="{Binding CanSave}" Height="40" CornerRadius="6" Background="#6f42c1" Foreground="White"/>
+            <Button Content="▶️ Start Job" Command="{Binding StartJobCommand}" IsEnabled="{Binding CanStart}" Height="44" CornerRadius="6" Background="#28A745" Foreground="White" IsVisible="{Binding !IsEditing}"/>
           </StackPanel>
         </StackPanel>
       </ScrollViewer>
@@ -142,7 +142,12 @@
                     <TextBlock Grid.Column="0" Grid.Row="1" Text="{Binding OutputFolder}" Foreground="#6A737D"/>
                     <TextBlock Grid.Column="1" Grid.RowSpan="2" Text="{Binding Status}" Margin="12,0" VerticalAlignment="Center"/>
                     <TextBlock Grid.Column="1" Grid.RowSpan="2" Text="{Binding Errors.Count, StringFormat='({0} errors)'}" Foreground="#DC3545" Margin="12,20,0,0" VerticalAlignment="Center" IsVisible="{Binding Errors.Count}"/>
-                    <Button Grid.Column="2" Grid.RowSpan="2" Content="Open" Command="{Binding DataContext.OpenJobCommand, ElementName=Root}" CommandParameter="{Binding}"/>
+                    
+                    <StackPanel Grid.Column="2" Grid.RowSpan="2" Orientation="Horizontal" Spacing="6">
+                        <Button Content="Edit" Command="{Binding DataContext.EditJobCommand, ElementName=Root}" CommandParameter="{Binding}" IsVisible="{Binding Status, Converter={StaticResource StepTypeVisibilityConverter}, ConverterParameter='Pending'}"/> 
+                        <Button Content="Delete" Command="{Binding DataContext.DeleteJobCommand, ElementName=Root}" CommandParameter="{Binding}" Foreground="#DC3545"/>
+                        <Button Content="Open" Command="{Binding DataContext.OpenJobCommand, ElementName=Root}" CommandParameter="{Binding}"/>
+                    </StackPanel>
                   </Grid>
                 </Border>
               </DataTemplate>

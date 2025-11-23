@@ -23,6 +23,33 @@ namespace PaperMind.ViewModels
         private string _inputFolder = string.Empty;
         private string _outputFolder = string.Empty;
 
+        private bool _isEditing;
+        public bool IsEditing
+        {
+            get => _isEditing;
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _isEditing, value);
+                this.RaisePropertyChanged(nameof(HeaderText));
+            }
+        }
+
+        private Guid? _editingJobId;
+        public Guid? EditingJobId
+        {
+            get => _editingJobId;
+            set => this.RaiseAndSetIfChanged(ref _editingJobId, value);
+        }
+
+        private string _createButtonText = "Create Job";
+        public string CreateButtonText
+        {
+            get => _createButtonText;
+            set => this.RaiseAndSetIfChanged(ref _createButtonText, value);
+        }
+
+        public string HeaderText => IsEditing ? "Update Job Configuration" : "Create Processing Job";
+
         // Pipeline
         public ObservableCollection<JobStepViewModel> PipelineSteps { get; } = new();
         public ObservableCollection<string> AvailableStepTypes { get; } = new()
@@ -58,6 +85,10 @@ namespace PaperMind.ViewModels
             MoveStepUpCommand = ReactiveCommand.Create<JobStepViewModel>(MoveStepUp);
             MoveStepDownCommand = ReactiveCommand.Create<JobStepViewModel>(MoveStepDown);
 
+            DeleteJobCommand = ReactiveCommand.CreateFromTask<ProcessingJob>(DeleteJobAsync);
+            EditJobCommand = ReactiveCommand.Create<ProcessingJob>(EditJob);
+            CancelEditCommand = ReactiveCommand.Create(CancelEdit);
+
             // Fix CanSave/CanStart not updating
             this.WhenAnyValue(x => x.InputFolder, x => x.OutputFolder)
                 .Subscribe(_ =>
@@ -92,6 +123,10 @@ namespace PaperMind.ViewModels
         public ICommand RemoveStepCommand { get; }
         public ICommand MoveStepUpCommand { get; }
         public ICommand MoveStepDownCommand { get; }
+
+        public ICommand DeleteJobCommand { get; }
+        public ICommand EditJobCommand { get; }
+        public ICommand CancelEditCommand { get; }
 
         public ProcessingJob? SelectedJob
         {
@@ -136,6 +171,59 @@ namespace PaperMind.ViewModels
             }
         }
 
+        private async Task DeleteJobAsync(ProcessingJob job)
+        {
+            if (job == null) return;
+
+            // Confirm? For now just delete
+            await _jobsService.DeleteJobAsync(job.JobId);
+            RefreshJobs();
+        }
+
+        private void EditJob(ProcessingJob job)
+        {
+            if (job == null) return;
+            if (job.Status != JobStatus.Pending) return; // Should be guarded by UI too
+
+            IsEditing = true;
+            EditingJobId = job.JobId;
+            InputFolder = job.InputFolder;
+            OutputFolder = job.OutputFolder;
+            CreateButtonText = "Update Job";
+
+            // Load pipeline
+            PipelineSteps.Clear();
+            if (!string.IsNullOrEmpty(job.PipelineJson))
+            {
+                try
+                {
+                    var steps = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<JobStepConfig>>(job.PipelineJson);
+                    if (steps != null)
+                    {
+                        foreach (var s in steps)
+                        {
+                            PipelineSteps.Add(new JobStepViewModel(s));
+                        }
+                    }
+                }
+                catch
+                {
+                    // Ignore error
+                }
+            }
+        }
+
+        private void CancelEdit()
+        {
+            IsEditing = false;
+            EditingJobId = null;
+            InputFolder = string.Empty;
+            OutputFolder = string.Empty;
+            PipelineSteps.Clear();
+            AddStep("OcrToSearchablePdf"); // Default
+            CreateButtonText = "Create Job";
+        }
+
         private async Task SelectInputFolderAsync()
         {
             var folder = await PickFolderAsync("Select Input Folder");
@@ -177,18 +265,42 @@ namespace PaperMind.ViewModels
 
         private async Task SaveJobAsync()
         {
-            // Create job with NO legacy steps flags (or minimal)
-            var job = await _jobsService.CreateJobAsync(InputFolder, OutputFolder, ProcessingStep.None);
-
-            // Set pipeline JSON directly
-            var pipeline = PipelineSteps.Select(vm => vm.GetConfig()).ToList();
-            job.PipelineJson = System.Text.Json.JsonSerializer.Serialize(pipeline);
-
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            if (IsEditing && EditingJobId.HasValue)
             {
+                // Update existing
+                var job = await _jobsService.GetJobAsync(EditingJobId.Value);
+                if (job != null)
+                {
+                    job.InputFolder = InputFolder;
+                    job.OutputFolder = OutputFolder;
+
+                    var pipeline = PipelineSteps.Select(vm => vm.GetConfig()).ToList();
+                    job.PipelineJson = System.Text.Json.JsonSerializer.Serialize(pipeline);
+
+                    await _jobsService.UpdateJobAsync(job);
+                }
+
+                CancelEdit(); // Reset UI
                 RefreshJobs();
-                _navigateToJob(job);
-            });
+            }
+            else
+            {
+                // Create new
+                var job = await _jobsService.CreateJobAsync(InputFolder, OutputFolder, ProcessingStep.None);
+
+                // Set pipeline JSON directly
+                var pipeline = PipelineSteps.Select(vm => vm.GetConfig()).ToList();
+                job.PipelineJson = System.Text.Json.JsonSerializer.Serialize(pipeline);
+
+                // We need to update the job in the repo with the pipeline
+                await _jobsService.UpdateJobAsync(job);
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    RefreshJobs();
+                    _navigateToJob(job);
+                });
+            }
         }
 
         private async Task StartJobAsync()

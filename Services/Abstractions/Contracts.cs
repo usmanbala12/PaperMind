@@ -50,7 +50,10 @@ namespace PaperMind.Services.Abstractions
         Task StartJobAsync(PaperMind.Models.ProcessingJob job);
         Task CancelJobAsync(System.Guid jobId);
         Task<PaperMind.Models.ProcessingJob?> GetJobAsync(System.Guid jobId);
+
         System.Collections.Generic.IEnumerable<PaperMind.Models.ProcessingJob> GetAllJobs();
+        Task UpdateJobAsync(PaperMind.Models.ProcessingJob job);
+        Task DeleteJobAsync(System.Guid jobId);
     }
 
     // Job repository for persistence
@@ -64,6 +67,8 @@ namespace PaperMind.Services.Abstractions
         // Per-file tracking
         void RecordFileSuccess(Guid jobId, string filePath);
         void RecordFileFailure(Guid jobId, string filePath, string error);
+
+        void DeleteJob(Guid jobId);
     }
 
     // Configuration abstraction for retrieving settings
