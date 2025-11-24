@@ -58,6 +58,7 @@ namespace PaperMind.Services.Implementations
                     Status INTEGER NOT NULL, -- 1=Success, 2=Failed
                     ErrorMessage TEXT NULL,
                     Timestamp TEXT NOT NULL,
+                    FileHash TEXT NULL,
                     PRIMARY KEY (JobId, FilePath)
                 );";
             cmd.ExecuteNonQuery();
@@ -76,6 +77,15 @@ namespace PaperMind.Services.Implementations
             {
                 using var cmdAlter = conn.CreateCommand();
                 cmdAlter.CommandText = "ALTER TABLE Jobs ADD COLUMN TriggerType INTEGER NOT NULL DEFAULT 0;";
+                cmdAlter.ExecuteNonQuery();
+            }
+            catch { /* Ignore if exists */ }
+
+            // Migration: Add FileHash if missing
+            try
+            {
+                using var cmdAlter = conn.CreateCommand();
+                cmdAlter.CommandText = "ALTER TABLE JobFileStatus ADD COLUMN FileHash TEXT NULL;";
                 cmdAlter.ExecuteNonQuery();
             }
             catch { /* Ignore if exists */ }
@@ -172,18 +182,19 @@ namespace PaperMind.Services.Implementations
             return job;
         }
 
-        public void RecordFileSuccess(Guid jobId, string filePath)
+        public void RecordFileSuccess(Guid jobId, string filePath, string? fileHash = null)
         {
             using var conn = new SqliteConnection(_connectionString);
             conn.Open();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                INSERT OR REPLACE INTO JobFileStatus (JobId, FilePath, Status, ErrorMessage, Timestamp)
-                VALUES (@JobId, @FilePath, 1, NULL, @Timestamp);";
+                INSERT OR REPLACE INTO JobFileStatus (JobId, FilePath, Status, ErrorMessage, Timestamp, FileHash)
+                VALUES (@JobId, @FilePath, 1, NULL, @Timestamp, @FileHash);";
 
             cmd.Parameters.Add(new SqliteParameter("@JobId", SqliteType.Text) { Value = jobId.ToString() });
             cmd.Parameters.Add(new SqliteParameter("@FilePath", SqliteType.Text) { Value = filePath });
             cmd.Parameters.Add(new SqliteParameter("@Timestamp", SqliteType.Text) { Value = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture) });
+            cmd.Parameters.Add(new SqliteParameter("@FileHash", SqliteType.Text) { Value = (object?)fileHash ?? DBNull.Value });
 
             cmd.ExecuteNonQuery();
         }
@@ -194,8 +205,8 @@ namespace PaperMind.Services.Implementations
             conn.Open();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                INSERT OR REPLACE INTO JobFileStatus (JobId, FilePath, Status, ErrorMessage, Timestamp)
-                VALUES (@JobId, @FilePath, 2, @ErrorMessage, @Timestamp);";
+                INSERT OR REPLACE INTO JobFileStatus (JobId, FilePath, Status, ErrorMessage, Timestamp, FileHash)
+                VALUES (@JobId, @FilePath, 2, @ErrorMessage, @Timestamp, NULL);";
 
             cmd.Parameters.Add(new SqliteParameter("@JobId", SqliteType.Text) { Value = jobId.ToString() });
             cmd.Parameters.Add(new SqliteParameter("@FilePath", SqliteType.Text) { Value = filePath });

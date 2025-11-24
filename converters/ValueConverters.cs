@@ -7,7 +7,7 @@ namespace PaperMind.Converters
 {
     public class EmptyStringToGrayConverter : IValueConverter
     {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value is string str && string.IsNullOrEmpty(str))
             {
@@ -16,7 +16,7 @@ namespace PaperMind.Converters
             return new SolidColorBrush(Color.Parse("#24292E"));
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
         }
@@ -24,7 +24,7 @@ namespace PaperMind.Converters
 
     public class ProcessingButtonTextConverter : IValueConverter
     {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value is bool isProcessing)
             {
@@ -33,7 +33,7 @@ namespace PaperMind.Converters
             return "▶️ Start Processing";
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
         }
@@ -41,7 +41,7 @@ namespace PaperMind.Converters
 
     public class PercentToWidthConverter : IValueConverter
     {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value is double percent)
             {
@@ -50,7 +50,7 @@ namespace PaperMind.Converters
             return 0.0;
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
         }
@@ -58,7 +58,7 @@ namespace PaperMind.Converters
 
     public class LogLevelToColorConverter : IValueConverter
     {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value is string logEntry)
             {

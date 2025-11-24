@@ -268,7 +268,9 @@ namespace PaperMind.Services.Implementations
             var list = new List<byte[]>();
             try
             {
+#pragma warning disable CS0618 // Type or member is obsolete
                 var experimental = page.ExperimentalAccess;
+#pragma warning restore CS0618 // Type or member is obsolete
                 if (experimental != null)
                 {
                     var method = experimental.GetType().GetMethod("GetImages");

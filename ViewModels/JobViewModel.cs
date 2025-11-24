@@ -64,8 +64,8 @@ namespace PaperMind.ViewModels
         public string JobId => _job.JobId.ToString();
         public string InputFolder => _job.InputFolder;
         public string OutputFolder => _job.OutputFolder;
-        public int FilesProcessed => _job.FilesProcessed;
-        public int TotalFiles => _job.TotalFiles;
+        public int FilesProcessed => (int)_job.FilesProcessed;
+        public int TotalFiles => (int)_job.TotalFiles;
         public JobStatus Status => _job.Status;
         public bool IsRunning => Status == JobStatus.Running;
         public bool IsNotRunning => !IsRunning;

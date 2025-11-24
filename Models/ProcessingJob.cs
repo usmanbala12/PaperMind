@@ -16,8 +16,8 @@ namespace PaperMind.Models
 
         public JobStatus Status { get; set; }
         public double Progress { get; set; }
-        public int FilesProcessed { get; set; }
-        public int TotalFiles { get; set; }
+        public long FilesProcessed { get; set; }  // Changed to long for Interlocked support
+        public long TotalFiles { get; set; }      // Changed to long for Interlocked support
         public DateTime StartTime { get; set; }
         public DateTime? EndTime { get; set; }
 

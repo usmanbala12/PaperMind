@@ -206,7 +206,7 @@ namespace PaperMind.Services.Implementations
                     return;
                 }
 
-                int index = job.FilesProcessed; // Continue count
+                int index = (int)job.FilesProcessed; // Continue count
                 var sessionStartTime = DateTime.UtcNow;
                 int sessionProcessedCount = 0;
 

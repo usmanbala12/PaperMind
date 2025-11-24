@@ -27,6 +27,7 @@
     <PackageReference Include="SkiaSharp" Version="2.88.*" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="2.88.*" />
     <PackageReference Include="ReactiveUI.Avalonia" Version="11.3.8" />
+    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="10.0.0" />
     <PackageReference Include="Tesseract" Version="5.0.0" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />

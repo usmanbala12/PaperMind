@@ -8,6 +8,7 @@ namespace PaperMind.Services.Abstractions
     {
         public ProcessingJob Job { get; }
         public string CurrentFilePath { get; set; }
+        public string? FileHash { get; set; }
         public ILoggingService Logger { get; }
         public Dictionary<string, object> SharedData { get; } = new();
 

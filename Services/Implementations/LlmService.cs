@@ -8,17 +8,12 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using PaperMind.Models;
 using PaperMind.Services.Abstractions;
+using System.Collections.Generic;
 
 namespace PaperMind.Services.Implementations
 {
-    public class LlmRequestConfig
-    {
-        public string? Provider { get; set; }
-        public string? Model { get; set; }
-        public string? ApiKey { get; set; }
-    }
-
     // LLM service with provider-agnostic HTTP integration (OpenAI, Anthropic, etc.)
     public sealed class LlmService : ILLMService
     {
@@ -34,7 +29,7 @@ namespace PaperMind.Services.Implementations
 
         // Generate a concise, filesystem-safe filename based on extracted text.
         // Ignores the incoming prompt and enforces a consistent filename-generation instruction.
-        public async Task<string> GenerateAsync(string prompt, string? input = null, LlmRequestConfig? requestConfig = null)
+        public async System.Threading.Tasks.Task<string> GenerateAsync(string prompt, string? input = null, PaperMind.Services.Abstractions.LlmConfigModel? requestConfig = null)
         {
             var now = DateTime.Now;
             try
@@ -303,6 +298,113 @@ namespace PaperMind.Services.Implementations
         private static string EscapeJson(string s)
         {
             return s.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        }
+
+        public async System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<string, string>> BatchGenerateAsync(System.Collections.Generic.Dictionary<string, string> inputs, PaperMind.Services.Abstractions.LlmConfigModel? requestConfig = null)
+        {
+            var results = new Dictionary<string, string>();
+            if (inputs == null || inputs.Count == 0) return results;
+
+            // If only one item, use single generation
+            if (inputs.Count == 1)
+            {
+                var kvp = inputs.First();
+                results[kvp.Key] = await GenerateAsync("Generate a concise filename...", kvp.Value, requestConfig);
+                return results;
+            }
+
+            var now = DateTime.Now;
+            try
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("Generate concise filenames (under 60 chars) for the following documents. Return a JSON object where keys are the IDs provided and values are the filenames (with .pdf extension). No markdown, just raw JSON.");
+                sb.AppendLine();
+
+                foreach (var kvp in inputs)
+                {
+                    var summary = Summarize(kvp.Value, 300); // Shorter summary for batch
+                    sb.AppendLine($"ID: {kvp.Key}");
+                    sb.AppendLine($"Content: {summary}");
+                    sb.AppendLine("---");
+                }
+
+                var finalPrompt = sb.ToString();
+                var provider = (requestConfig?.Provider ?? _config.Get("LLM_PROVIDER") ?? "openai").Trim().ToLowerInvariant();
+                var model = requestConfig?.Model ?? _config.Get("LLM_MODEL") ?? (provider == "anthropic" ? "claude-3-haiku-20240307" : "gpt-4o-mini");
+                var maxTokens = inputs.Count * 20 + 100; // Estimate tokens needed
+
+                // Call LLM
+                string rawResponse = "";
+                try
+                {
+                    (string text, int? promptTokens, int? completionTokens) result = provider switch
+                    {
+                        "anthropic" => await CallAnthropicAsync(finalPrompt, model, 0.2, maxTokens, requestConfig?.ApiKey),
+                        _ => await CallOpenAIAsync(finalPrompt, model, 0.2, maxTokens, requestConfig?.ApiKey),
+                    };
+                    rawResponse = result.text;
+                    LogCostEstimation(provider, model, finalPrompt, result.promptTokens, result.completionTokens);
+                }
+                catch (Exception ex)
+                {
+                    _log.Warn($"Batch LLM call failed: {ex.Message}. Falling back to individual calls.");
+                    // Fallback to individual calls
+                    foreach (var kvp in inputs)
+                    {
+                        results[kvp.Key] = await GenerateAsync("Generate a concise filename...", kvp.Value, requestConfig);
+                    }
+                    return results;
+                }
+
+                // Parse JSON response
+                try
+                {
+                    // Clean up markdown code blocks if present
+                    var json = rawResponse.Trim();
+                    if (json.StartsWith("```json")) json = json.Substring(7);
+                    if (json.StartsWith("```")) json = json.Substring(3);
+                    if (json.EndsWith("```")) json = json.Substring(0, json.Length - 3);
+
+                    var parsed = JsonSerializer.Deserialize<Dictionary<string, string>>(json.Trim());
+                    if (parsed != null)
+                    {
+                        foreach (var kvp in parsed)
+                        {
+                            if (inputs.ContainsKey(kvp.Key))
+                            {
+                                var cleaned = SanitizeFilename(kvp.Value);
+                                if (!cleaned.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) cleaned += ".pdf";
+                                results[kvp.Key] = cleaned;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.Warn($"Failed to parse batch LLM response: {ex.Message}. Response: {rawResponse}");
+                }
+
+                // Fill in any missing items with individual calls (or fallback)
+                foreach (var key in inputs.Keys)
+                {
+                    if (!results.ContainsKey(key))
+                    {
+                        results[key] = await GenerateAsync("Generate a concise filename...", inputs[key], requestConfig);
+                    }
+                }
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                _log.Error("Unexpected error in BatchGenerateAsync", ex);
+                // Fallback
+                foreach (var kvp in inputs)
+                {
+                    results[kvp.Key] = FallbackFilename(now);
+                }
+                return results;
+            }
         }
 
         private static string FallbackFilename(DateTime now)

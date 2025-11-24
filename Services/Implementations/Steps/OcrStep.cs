@@ -21,6 +21,13 @@ namespace PaperMind.Services.Implementations.Steps
             _config = config;
         }
 
+        public bool IsBatchable => false;
+
+        public Task ExecuteBatchAsync(JobContext[] contexts, JobStepConfig config)
+        {
+            throw new NotSupportedException("OCR step does not support batching.");
+        }
+
         public async Task ExecuteAsync(JobContext context, JobStepConfig config)
         {
             var inputPath = context.CurrentFilePath;

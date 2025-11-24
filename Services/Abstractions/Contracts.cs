@@ -19,10 +19,18 @@ namespace PaperMind.Services.Abstractions
         Task<OcrResult> ProcessPdfAsync(string pdfPath, OcrConfig config);
     }
 
+    public class LlmConfigModel
+    {
+        public string? Provider { get; set; }
+        public string? Model { get; set; }
+        public string? ApiKey { get; set; }
+    }
+
     // Provides LLM-powered processing of text (summaries, classification, etc.)
     public interface ILLMService
     {
-        Task<string> GenerateAsync(string prompt, string? input = null, PaperMind.Services.Implementations.LlmRequestConfig? requestConfig = null);
+        Task<string> GenerateAsync(string prompt, string? input = null, LlmConfigModel? requestConfig = null);
+        Task<Dictionary<string, string>> BatchGenerateAsync(Dictionary<string, string> inputs, LlmConfigModel? requestConfig = null);
     }
 
     // Provides low-level PDF operations
@@ -67,7 +75,7 @@ namespace PaperMind.Services.Abstractions
         IEnumerable<PaperMind.Models.ProcessingJob> GetAllJobs();
 
         // Per-file tracking
-        void RecordFileSuccess(Guid jobId, string filePath);
+        void RecordFileSuccess(Guid jobId, string filePath, string? fileHash = null);
         void RecordFileFailure(Guid jobId, string filePath, string error);
         void ClearJobHistory(Guid jobId);
 

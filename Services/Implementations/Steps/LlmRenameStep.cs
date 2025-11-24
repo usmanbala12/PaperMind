@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using PaperMind.Models;
 using PaperMind.Models.Enums;
 using PaperMind.Services.Abstractions;
+using System.Collections.Generic;
 
 namespace PaperMind.Services.Implementations.Steps
 {
@@ -22,8 +23,12 @@ namespace PaperMind.Services.Implementations.Steps
             _config = config;
         }
 
+        public bool IsBatchable => true;
+
         public async Task ExecuteAsync(JobContext context, JobStepConfig config)
         {
+            // ... (keep existing implementation, maybe refactor common logic if needed, but for now keep as is or delegate)
+            // Actually, let's keep the existing ExecuteAsync as is for single execution fallback
             var inputPath = context.CurrentFilePath;
 
             context.Logger.Info($"[Job {context.Job.JobId}] Generating name for: {inputPath}");
@@ -43,7 +48,7 @@ namespace PaperMind.Services.Implementations.Steps
             var prompt = _config.Get("LLM_PROMPT") ?? "Generate a concise filename based on the document content. Return ONLY the filename, no extension.";
 
             // Extract LLM config from step parameters
-            var llmConfig = new LlmRequestConfig
+            var llmConfig = new LlmConfigModel
             {
                 Provider = config.Parameters.TryGetValue("LlmProvider", out var p) ? p : null,
                 Model = config.Parameters.TryGetValue("LlmModel", out var m) ? m : null,
@@ -52,6 +57,53 @@ namespace PaperMind.Services.Implementations.Steps
 
             var newName = await _llm.GenerateAsync(prompt, text, llmConfig).ConfigureAwait(false);
 
+            ApplyRename(context, newName);
+        }
+
+        public async Task ExecuteBatchAsync(JobContext[] contexts, JobStepConfig config)
+        {
+            if (contexts.Length == 0) return;
+
+            var inputs = new Dictionary<string, string>();
+            var contextMap = new Dictionary<string, JobContext>();
+
+            foreach (var ctx in contexts)
+            {
+                var id = Guid.NewGuid().ToString();
+                contextMap[id] = ctx;
+
+                try
+                {
+                    var text = await _ocr.ExtractTextAsync(ctx.CurrentFilePath, OcrQuality.Fast, "eng").ConfigureAwait(false) ?? string.Empty;
+                    inputs[id] = text;
+                }
+                catch (Exception ex)
+                {
+                    ctx.Logger.Warn($"Text extraction failed for batch item {ctx.CurrentFilePath}: {ex.Message}");
+                    inputs[id] = ""; // Will likely get a fallback name
+                }
+            }
+
+            var llmConfig = new LlmConfigModel
+            {
+                Provider = config.Parameters.TryGetValue("LlmProvider", out var p) ? p : null,
+                Model = config.Parameters.TryGetValue("LlmModel", out var m) ? m : null,
+                ApiKey = config.Parameters.TryGetValue("LlmApiKey", out var k) ? k : null
+            };
+
+            var results = await _llm.BatchGenerateAsync(inputs, llmConfig);
+
+            foreach (var kvp in results)
+            {
+                if (contextMap.TryGetValue(kvp.Key, out var ctx))
+                {
+                    ApplyRename(ctx, kvp.Value);
+                }
+            }
+        }
+
+        private void ApplyRename(JobContext context, string newName)
+        {
             if (string.IsNullOrWhiteSpace(newName))
             {
                 newName = $"Document_{DateTime.Now:yyyyMMdd_HHmmss}";
@@ -69,16 +121,22 @@ namespace PaperMind.Services.Implementations.Steps
                 newName += ".pdf";
             }
 
-            var dir = Path.GetDirectoryName(inputPath)!;
+            var dir = Path.GetDirectoryName(context.CurrentFilePath)!;
             var newPath = Path.Combine(dir, newName);
 
             // Ensure unique
             newPath = EnsureUniquePath(newPath);
 
-            File.Move(inputPath, newPath);
-            context.CurrentFilePath = newPath;
-
-            context.Logger.Info($"[Job {context.Job.JobId}] Renamed to: {newName}");
+            try
+            {
+                File.Move(context.CurrentFilePath, newPath);
+                context.CurrentFilePath = newPath;
+                context.Logger.Info($"[Job {context.Job.JobId}] Renamed to: {newName}");
+            }
+            catch (Exception ex)
+            {
+                context.Logger.Error($"Failed to rename {context.CurrentFilePath} to {newPath}", ex);
+            }
         }
 
         private static string EnsureUniquePath(string path)

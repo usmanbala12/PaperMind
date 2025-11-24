@@ -20,6 +20,13 @@ namespace PaperMind.Services.Implementations.Steps
             _config = config;
         }
 
+        public bool IsBatchable => false;
+
+        public Task ExecuteBatchAsync(JobContext[] contexts, JobStepConfig config)
+        {
+            throw new NotSupportedException("Upload step does not support batching.");
+        }
+
         public async Task ExecuteAsync(JobContext context, JobStepConfig config)
         {
             var path = context.CurrentFilePath;
@@ -32,7 +39,7 @@ namespace PaperMind.Services.Implementations.Steps
             }
             else
             {
-                providerStr = _config.Get("StorageProvider");
+                providerStr = _config.Get("StorageProvider") ?? string.Empty;
             }
 
             if (Enum.TryParse<StorageProvider>(providerStr, out var provider))
@@ -52,8 +59,11 @@ namespace PaperMind.Services.Implementations.Steps
                     string remotePath;
                     if (!string.IsNullOrWhiteSpace(targetFolder))
                     {
-                        // Normalize separators
-                        targetFolder = targetFolder.Replace('\\', '/');
+                        // Normalize path separators for cloud storage (always use forward slash)
+                        // Split on both primary and alternate separators to handle all platforms correctly
+                        var parts = targetFolder.Split(new[] { System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+                        targetFolder = string.Join('/', parts);
+                        
                         if (!targetFolder.EndsWith("/")) targetFolder += "/";
                         remotePath = targetFolder + fileName;
                     }
