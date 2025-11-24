@@ -78,6 +78,7 @@ namespace PaperMind.Services.Abstractions
         void RecordFileSuccess(Guid jobId, string filePath, string? fileHash = null);
         void RecordFileFailure(Guid jobId, string filePath, string error);
         void ClearJobHistory(Guid jobId);
+        string? GetFileHash(Guid jobId, string filePath);
 
         void DeleteJob(Guid jobId);
     }

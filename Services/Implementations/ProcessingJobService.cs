@@ -3,8 +3,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 using PaperMind.Models;
 using PaperMind.Models.Enums;
 using PaperMind.Models.Ocr;
@@ -210,77 +212,149 @@ namespace PaperMind.Services.Implementations
                 var sessionStartTime = DateTime.UtcNow;
                 int sessionProcessedCount = 0;
 
-                foreach (var path in filesToProcess)
+                // Configure parallel processing with TPL Dataflow
+                var maxDegreeOfParallelism = _config.Get("MaxDegreeOfParallelism", Environment.ProcessorCount);
+                // Ensure it doesn't exceed processor count
+                if (maxDegreeOfParallelism > Environment.ProcessorCount)
+                    maxDegreeOfParallelism = Environment.ProcessorCount;
+                if (maxDegreeOfParallelism < 1)
+                    maxDegreeOfParallelism = 1;
+
+                _log.Info($"[Job {job.JobId}] Using parallel processing with {maxDegreeOfParallelism} threads");
+
+                var processingOptions = new ExecutionDataflowBlockOptions
                 {
-                    token.ThrowIfCancellationRequested();
+                    MaxDegreeOfParallelism = maxDegreeOfParallelism,
+                    CancellationToken = token,
+                    BoundedCapacity = maxDegreeOfParallelism * 2 // Limit buffering
+                };
 
-                    index++;
-                    job.CurrentFile = Path.GetFileName(path);
-                    _log.Info($"[Job {job.JobId}] Processing ({index}/{job.TotalFiles}): {job.CurrentFile}");
+                var processBlock = new ActionBlock<string>(async path =>
+                {
+                    var currentIndex = Interlocked.Increment(ref index);
+                    var fileName = Path.GetFileName(path);
 
-                    // Remove any existing error for this file since we are retrying it
-                    job.Errors.RemoveAll(e => e.FilePath == path);
-
-                    bool success = false;
-                    const int maxRetries = 3;
-
-                    for (int attempt = 1; attempt <= maxRetries; attempt++)
+                    try
                     {
+                        // Compute file hash for caching
+                        string? fileHash = null;
                         try
                         {
-                            await ProcessSingleAsync(job, path, token).ConfigureAwait(false);
-                            success = true;
+                            fileHash = await ComputeFileHashAsync(path).ConfigureAwait(false);
 
-                            // Mark success
-                            _repo.RecordFileSuccess(job.JobId, path);
-                            job.ProcessedFiles.Add(path);
-
-                            job.FilesProcessed++;
-                            sessionProcessedCount++;
-                            job.Progress = job.TotalFiles > 0 ? (double)job.FilesProcessed / job.TotalFiles : 1d;
-
-                            // Calculate metrics
-                            var elapsedMinutes = (DateTime.UtcNow - sessionStartTime).TotalMinutes;
-                            if (elapsedMinutes > 0)
+                            // Check cache - skip if file unchanged
+                            var cachedHash = _repo.GetFileHash(job.JobId, path);
+                            if (cachedHash != null && cachedHash.Equals(fileHash, StringComparison.OrdinalIgnoreCase))
                             {
-                                job.Throughput = sessionProcessedCount / elapsedMinutes;
-                                var remainingFiles = job.TotalFiles - job.FilesProcessed;
-                                if (job.Throughput > 0)
+                                _log.Info($"[Job {job.JobId}] Cache HIT ({currentIndex}/{job.TotalFiles}): {fileName} - skipping");
+
+                                // Update metrics for cached file
+                                job.FilesProcessed++;
+                                Interlocked.Increment(ref sessionProcessedCount);
+                                job.Progress = job.TotalFiles > 0 ? (double)job.FilesProcessed / job.TotalFiles : 1d;
+
+                                return; // Skip processing
+                            }
+                            else if (cachedHash != null)
+                            {
+                                _log.Info($"[Job {job.JobId}] Cache mismatch for {fileName} - reprocessing");
+                            }
+                        }
+                        catch (Exception hashEx)
+                        {
+                            _log.Warn($"Failed to compute hash for {fileName}: {hashEx.Message}");
+                        }
+
+                        job.CurrentFile = fileName;
+                        _log.Info($"[Job {job.JobId}] Processing ({currentIndex}/{job.TotalFiles}): {fileName}");
+
+                        // Remove any existing error for this file since we are retrying it
+                        lock (job.Errors)
+                        {
+                            job.Errors.RemoveAll(e => e.FilePath == path);
+                        }
+
+                        bool success = false;
+                        const int maxRetries = 3;
+
+                        for (int attempt = 1; attempt <= maxRetries; attempt++)
+                        {
+                            try
+                            {
+                                await ProcessSingleAsync(job, path, token).ConfigureAwait(false);
+                                success = true;
+
+                                // Mark success with hash
+                                _repo.RecordFileSuccess(job.JobId, path, fileHash);
+                                lock (job.ProcessedFiles)
                                 {
-                                    job.EstimatedTimeRemaining = TimeSpan.FromMinutes(remainingFiles / job.Throughput);
+                                    job.ProcessedFiles.Add(path);
                                 }
-                            }
 
-                            _repo.UpdateJob(job);
-                            break; // Success, exit retry loop
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            throw;
-                        }
-                        catch (Exception ex)
-                        {
-                            if (attempt == maxRetries)
-                            {
-                                _log.Error($"Job {job.JobId} file failed after {maxRetries} attempts: {path}", ex);
-                                var errorMsg = ex.Message;
-                                _repo.RecordFileFailure(job.JobId, path, errorMsg);
-                                job.Errors.Add(new FileProcessingError
+                                job.FilesProcessed++;
+                                Interlocked.Increment(ref sessionProcessedCount);
+                                job.Progress = job.TotalFiles > 0 ? (double)job.FilesProcessed / job.TotalFiles : 1d;
+
+                                // Calculate metrics
+                                var elapsedMinutes = (DateTime.UtcNow - sessionStartTime).TotalMinutes;
+                                if (elapsedMinutes > 0)
                                 {
-                                    FileName = Path.GetFileName(path),
-                                    FilePath = path,
-                                    ErrorMessage = errorMsg,
-                                    Timestamp = DateTime.Now
-                                });
+                                    job.Throughput = sessionProcessedCount / elapsedMinutes;
+                                    var remainingFiles = job.TotalFiles - job.FilesProcessed;
+                                    if (job.Throughput > 0)
+                                    {
+                                        job.EstimatedTimeRemaining = TimeSpan.FromMinutes(remainingFiles / job.Throughput);
+                                    }
+                                }
+
+                                _repo.UpdateJob(job);
+                                break; // Success, exit retry loop
                             }
-                            else
+                            catch (OperationCanceledException)
                             {
-                                _log.Warn($"Job {job.JobId} file failed (attempt {attempt}): {path}. Retrying...");
-                                await Task.Delay(1000 * attempt, token); // Backoff
+                                throw;
+                            }
+                            catch (Exception ex)
+                            {
+                                if (attempt == maxRetries)
+                                {
+                                    _log.Error($"Job {job.JobId} file failed after {maxRetries} attempts: {path}", ex);
+                                    var errorMsg = ex.Message;
+                                    _repo.RecordFileFailure(job.JobId, path, errorMsg);
+                                    lock (job.Errors)
+                                    {
+                                        job.Errors.Add(new FileProcessingError
+                                        {
+                                            FileName = fileName,
+                                            FilePath = path,
+                                            ErrorMessage = errorMsg,
+                                            Timestamp = DateTime.Now
+                                        });
+                                    }
+                                }
+                                else
+                                {
+                                    _log.Warn($"Job {job.JobId} file failed (attempt {attempt}): {path}. Retrying...");
+                                    await Task.Delay(1000 * attempt, token); // Backoff
+                                }
                             }
                         }
                     }
+                    catch (Exception ex)
+                    {
+                        _log.Error($"Unexpected error processing {fileName}", ex);
+                    }
+                }, processingOptions);
+
+                // Post all files to the processing block
+                foreach (var path in filesToProcess)
+                {
+                    await processBlock.SendAsync(path, token).ConfigureAwait(false);
                 }
+
+                // Signal completion and wait for all processing to finish
+                processBlock.Complete();
+                await processBlock.Completion.ConfigureAwait(false);
 
                 if (job.TriggerType == JobTriggerType.Watch && !token.IsCancellationRequested)
                 {
@@ -453,6 +527,14 @@ namespace PaperMind.Services.Implementations
             _jobs.TryRemove(jobId, out _);
             _repo.DeleteJob(jobId);
             return Task.CompletedTask;
+        }
+
+        private static async Task<string> ComputeFileHashAsync(string filePath)
+        {
+            using var stream = File.OpenRead(filePath);
+            using var sha256 = SHA256.Create();
+            var hashBytes = await Task.Run(() => sha256.ComputeHash(stream)).ConfigureAwait(false);
+            return BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
         }
 
         private static string EnsureUniquePath(string path)
