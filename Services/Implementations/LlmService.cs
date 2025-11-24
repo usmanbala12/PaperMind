@@ -12,6 +12,13 @@ using PaperMind.Services.Abstractions;
 
 namespace PaperMind.Services.Implementations
 {
+    public class LlmRequestConfig
+    {
+        public string? Provider { get; set; }
+        public string? Model { get; set; }
+        public string? ApiKey { get; set; }
+    }
+
     // LLM service with provider-agnostic HTTP integration (OpenAI, Anthropic, etc.)
     public sealed class LlmService : ILLMService
     {
@@ -27,7 +34,7 @@ namespace PaperMind.Services.Implementations
 
         // Generate a concise, filesystem-safe filename based on extracted text.
         // Ignores the incoming prompt and enforces a consistent filename-generation instruction.
-        public async Task<string> GenerateAsync(string prompt, string? input = null)
+        public async Task<string> GenerateAsync(string prompt, string? input = null, LlmRequestConfig? requestConfig = null)
         {
             var now = DateTime.Now;
             try
@@ -42,8 +49,8 @@ namespace PaperMind.Services.Implementations
                 var summary = Summarize(content, 500);
                 var finalPrompt = BuildFilenamePrompt(summary);
 
-                var provider = (_config.Get("LLM_PROVIDER") ?? "openai").Trim().ToLowerInvariant();
-                var model = _config.Get("LLM_MODEL") ?? (provider == "anthropic" ? "claude-3-haiku-20240307" : "gpt-4o-mini");
+                var provider = (requestConfig?.Provider ?? _config.Get("LLM_PROVIDER") ?? "openai").Trim().ToLowerInvariant();
+                var model = requestConfig?.Model ?? _config.Get("LLM_MODEL") ?? (provider == "anthropic" ? "claude-3-haiku-20240307" : "gpt-4o-mini");
 
                 var maxAttempts = _config.Get("LLM_RETRY_ATTEMPTS", 3);
                 var temperature = double.TryParse(_config.Get("LLM_TEMPERATURE"), out var t) ? Math.Clamp(t, 0, 1) : 0.2;
@@ -58,8 +65,8 @@ namespace PaperMind.Services.Implementations
                     {
                         (string text, int? promptTokens, int? completionTokens) result = provider switch
                         {
-                            "anthropic" => await CallAnthropicAsync(finalPrompt, model, temperature, maxTokens),
-                            _ => await CallOpenAIAsync(finalPrompt, model, temperature, maxTokens),
+                            "anthropic" => await CallAnthropicAsync(finalPrompt, model, temperature, maxTokens, requestConfig?.ApiKey),
+                            _ => await CallOpenAIAsync(finalPrompt, model, temperature, maxTokens, requestConfig?.ApiKey),
                         };
 
                         var raw = (result.text ?? string.Empty).Trim();
@@ -111,9 +118,9 @@ namespace PaperMind.Services.Implementations
             }
         }
 
-        private async Task<(string text, int? promptTokens, int? completionTokens)> CallOpenAIAsync(string finalPrompt, string model, double temperature, int maxTokens)
+        private async Task<(string text, int? promptTokens, int? completionTokens)> CallOpenAIAsync(string finalPrompt, string model, double temperature, int maxTokens, string? apiKeyOverride)
         {
-            var apiKey = _config.Get("OPENAI_API_KEY");
+            var apiKey = apiKeyOverride ?? _config.Get("OPENAI_API_KEY");
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new InvalidOperationException("Missing OPENAI_API_KEY environment variable");
 
@@ -165,9 +172,9 @@ namespace PaperMind.Services.Implementations
             return (text, ptok, ctok);
         }
 
-        private async Task<(string text, int? promptTokens, int? completionTokens)> CallAnthropicAsync(string finalPrompt, string model, double temperature, int maxTokens)
+        private async Task<(string text, int? promptTokens, int? completionTokens)> CallAnthropicAsync(string finalPrompt, string model, double temperature, int maxTokens, string? apiKeyOverride)
         {
-            var apiKey = _config.Get("ANTHROPIC_API_KEY");
+            var apiKey = apiKeyOverride ?? _config.Get("ANTHROPIC_API_KEY");
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new InvalidOperationException("Missing ANTHROPIC_API_KEY environment variable");
 

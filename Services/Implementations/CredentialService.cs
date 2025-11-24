@@ -107,14 +107,22 @@ namespace PaperMind.Services.Implementations
 
         private byte[] EncryptWindows(byte[] data)
         {
-            // Use Windows DPAPI (Data Protection API)
-            return ProtectedData.Protect(data, null, DataProtectionScope.CurrentUser);
+            if (OperatingSystem.IsWindows())
+            {
+                // Use Windows DPAPI (Data Protection API)
+                return ProtectedData.Protect(data, null, DataProtectionScope.CurrentUser);
+            }
+            throw new PlatformNotSupportedException("Windows DPAPI is only supported on Windows.");
         }
 
         private byte[] DecryptWindows(byte[] encryptedData)
         {
-            // Use Windows DPAPI (Data Protection API)
-            return ProtectedData.Unprotect(encryptedData, null, DataProtectionScope.CurrentUser);
+            if (OperatingSystem.IsWindows())
+            {
+                // Use Windows DPAPI (Data Protection API)
+                return ProtectedData.Unprotect(encryptedData, null, DataProtectionScope.CurrentUser);
+            }
+            throw new PlatformNotSupportedException("Windows DPAPI is only supported on Windows.");
         }
 
         private byte[] EncryptCrossPlatform(byte[] data)

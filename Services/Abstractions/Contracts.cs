@@ -22,7 +22,7 @@ namespace PaperMind.Services.Abstractions
     // Provides LLM-powered processing of text (summaries, classification, etc.)
     public interface ILLMService
     {
-        Task<string> GenerateAsync(string prompt, string? input = null);
+        Task<string> GenerateAsync(string prompt, string? input = null, PaperMind.Services.Implementations.LlmRequestConfig? requestConfig = null);
     }
 
     // Provides low-level PDF operations
@@ -46,7 +46,9 @@ namespace PaperMind.Services.Abstractions
     // Job management service for flexible, step-based processing
     public interface IProcessingJobService
     {
-        Task<PaperMind.Models.ProcessingJob> CreateJobAsync(string inputFolder, string outputFolder, PaperMind.Models.Enums.ProcessingStep steps);
+        Task<PaperMind.Models.ProcessingJob> CreateJobAsync(string inputFolder, string outputFolder, PaperMind.Models.Enums.ProcessingStep steps, PaperMind.Models.Enums.JobTriggerType triggerType = PaperMind.Models.Enums.JobTriggerType.Manual);
+        Task<PaperMind.Models.ProcessingJob> DuplicateJobAsync(System.Guid sourceJobId);
+        Task RestartJobAsync(System.Guid jobId);
         Task StartJobAsync(PaperMind.Models.ProcessingJob job);
         Task CancelJobAsync(System.Guid jobId);
         Task<PaperMind.Models.ProcessingJob?> GetJobAsync(System.Guid jobId);
@@ -67,6 +69,7 @@ namespace PaperMind.Services.Abstractions
         // Per-file tracking
         void RecordFileSuccess(Guid jobId, string filePath);
         void RecordFileFailure(Guid jobId, string filePath, string error);
+        void ClearJobHistory(Guid jobId);
 
         void DeleteJob(Guid jobId);
     }

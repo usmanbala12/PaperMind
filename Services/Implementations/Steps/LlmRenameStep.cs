@@ -41,7 +41,16 @@ namespace PaperMind.Services.Implementations.Steps
             }
 
             var prompt = _config.Get("LLM_PROMPT") ?? "Generate a concise filename based on the document content. Return ONLY the filename, no extension.";
-            var newName = await _llm.GenerateAsync(prompt, text).ConfigureAwait(false);
+
+            // Extract LLM config from step parameters
+            var llmConfig = new LlmRequestConfig
+            {
+                Provider = config.Parameters.TryGetValue("LlmProvider", out var p) ? p : null,
+                Model = config.Parameters.TryGetValue("LlmModel", out var m) ? m : null,
+                ApiKey = config.Parameters.TryGetValue("LlmApiKey", out var k) ? k : null
+            };
+
+            var newName = await _llm.GenerateAsync(prompt, text, llmConfig).ConfigureAwait(false);
 
             if (string.IsNullOrWhiteSpace(newName))
             {

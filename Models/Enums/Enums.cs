@@ -7,7 +7,14 @@ namespace PaperMind.Models.Enums
         Completed = 2,
         Failed = 3,
         Cancelled = 4,
-        CompletedWithErrors = 5
+        CompletedWithErrors = 5,
+        Watching = 6
+    }
+
+    public enum JobTriggerType
+    {
+        Manual = 0,
+        Watch = 1
     }
 
     public enum ProcessingStatus

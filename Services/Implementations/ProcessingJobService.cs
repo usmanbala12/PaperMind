@@ -24,6 +24,7 @@ namespace PaperMind.Services.Implementations
 
         private readonly ConcurrentDictionary<Guid, ProcessingJob> _jobs = new();
         private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _cancellations = new();
+        private readonly ConcurrentDictionary<Guid, FileSystemWatcher> _watchers = new();
 
         private readonly Dictionary<string, IJobStep> _availableSteps;
 
@@ -47,7 +48,7 @@ namespace PaperMind.Services.Implementations
             _availableSteps = steps.ToDictionary(s => s.StepType);
         }
 
-        public Task<ProcessingJob> CreateJobAsync(string inputFolder, string outputFolder, ProcessingStep steps)
+        public Task<ProcessingJob> CreateJobAsync(string inputFolder, string outputFolder, ProcessingStep steps, JobTriggerType triggerType = JobTriggerType.Manual)
         {
             if (string.IsNullOrWhiteSpace(inputFolder) || !Directory.Exists(inputFolder))
                 throw new DirectoryNotFoundException($"Input folder not found: {inputFolder}");
@@ -64,7 +65,8 @@ namespace PaperMind.Services.Implementations
                 Progress = 0,
                 FilesProcessed = 0,
                 TotalFiles = 0,
-                StartTime = DateTime.UtcNow
+                StartTime = DateTime.UtcNow,
+                TriggerType = triggerType
             };
 
             // Build pipeline JSON from legacy flags
@@ -105,6 +107,62 @@ namespace PaperMind.Services.Implementations
             _jobs[job.JobId] = job;
             _repo.AddJob(job);
             return Task.FromResult(job);
+        }
+
+        public async Task<ProcessingJob> DuplicateJobAsync(Guid sourceJobId)
+        {
+            var sourceJob = await GetJobAsync(sourceJobId);
+            if (sourceJob == null) throw new ArgumentException("Source job not found", nameof(sourceJobId));
+
+            var newJob = new ProcessingJob
+            {
+                JobId = Guid.NewGuid(),
+                InputFolder = sourceJob.InputFolder,
+                OutputFolder = sourceJob.OutputFolder,
+                Steps = sourceJob.Steps,
+                Status = JobStatus.Pending,
+                Progress = 0,
+                FilesProcessed = 0,
+                TotalFiles = 0,
+                StartTime = DateTime.UtcNow,
+                OcrQuality = sourceJob.OcrQuality,
+                OcrLanguage = sourceJob.OcrLanguage,
+                PipelineJson = sourceJob.PipelineJson,
+                TriggerType = sourceJob.TriggerType
+            };
+
+            _jobs[newJob.JobId] = newJob;
+            _repo.AddJob(newJob);
+            return newJob;
+        }
+
+        public async Task RestartJobAsync(Guid jobId)
+        {
+            var job = await GetJobAsync(jobId);
+            if (job == null) throw new ArgumentException("Job not found", nameof(jobId));
+
+            // Reset state
+            job.Status = JobStatus.Pending;
+            job.Progress = 0;
+            job.FilesProcessed = 0;
+            job.TotalFiles = 0;
+            job.StartTime = DateTime.UtcNow;
+            job.EndTime = null;
+            job.Errors.Clear();
+            job.ProcessedFiles.Clear();
+
+            // Clear metrics
+            job.CurrentFile = string.Empty;
+            job.Throughput = 0;
+            job.EstimatedTimeRemaining = null;
+
+            // Clear file status in repo
+            _repo.ClearJobHistory(jobId);
+
+            _repo.UpdateJob(job);
+
+            // Start it
+            await StartJobAsync(job);
         }
 
         public async Task StartJobAsync(ProcessingJob job)
@@ -224,7 +282,13 @@ namespace PaperMind.Services.Implementations
                     }
                 }
 
-                if (job.Errors.Count > 0)
+                if (job.TriggerType == JobTriggerType.Watch && !token.IsCancellationRequested)
+                {
+                    job.Status = JobStatus.Watching;
+                    _log.Info($"Job {job.JobId} entering watch mode on {job.InputFolder}");
+                    StartWatcher(job);
+                }
+                else if (job.Errors.Count > 0)
                 {
                     job.Status = JobStatus.CompletedWithErrors;
                     _log.Warn($"Job {job.JobId} completed with {job.Errors.Count} errors.");
@@ -234,10 +298,12 @@ namespace PaperMind.Services.Implementations
                     job.Status = JobStatus.Completed;
                 }
 
-                // Clear transient metrics on completion
+                // Clear transient metrics on completion/watch
                 job.CurrentFile = string.Empty;
                 job.EstimatedTimeRemaining = null;
                 job.Throughput = 0;
+
+                _repo.UpdateJob(job);
             }
             catch (OperationCanceledException)
             {
@@ -322,6 +388,12 @@ namespace PaperMind.Services.Implementations
 
         public Task CancelJobAsync(Guid jobId)
         {
+            if (_watchers.TryRemove(jobId, out var watcher))
+            {
+                watcher.EnableRaisingEvents = false;
+                watcher.Dispose();
+            }
+
             if (_cancellations.TryGetValue(jobId, out var cts))
             {
                 cts.Cancel();
@@ -365,9 +437,11 @@ namespace PaperMind.Services.Implementations
 
         public Task DeleteJobAsync(Guid jobId)
         {
-            // If running, cancel first? Or just forbid?
-            // Let's forbid deleting running jobs for safety, or cancel them.
-            // For now, let's just remove.
+            if (_watchers.TryRemove(jobId, out var watcher))
+            {
+                watcher.EnableRaisingEvents = false;
+                watcher.Dispose();
+            }
 
             if (_cancellations.TryGetValue(jobId, out var cts))
             {
@@ -395,6 +469,85 @@ namespace PaperMind.Services.Implementations
                 i++;
             } while (File.Exists(candidate));
             return candidate;
+        }
+
+        private void StartWatcher(ProcessingJob job)
+        {
+            if (_watchers.ContainsKey(job.JobId)) return;
+
+            try
+            {
+                var watcher = new FileSystemWatcher(job.InputFolder, "*.pdf");
+                watcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite;
+                watcher.Created += async (s, e) => await ProcessWatchedFileAsync(job, e.FullPath);
+                watcher.EnableRaisingEvents = true;
+                _watchers[job.JobId] = watcher;
+            }
+            catch (Exception ex)
+            {
+                _log.Error($"Failed to start watcher for job {job.JobId}", ex);
+            }
+        }
+
+        private async Task ProcessWatchedFileAsync(ProcessingJob job, string path)
+        {
+            if (!_cancellations.TryGetValue(job.JobId, out var cts) || cts.IsCancellationRequested) return;
+            var token = cts.Token;
+
+            try
+            {
+                // Wait for file lock
+                await Task.Delay(1000, token);
+
+                job.CurrentFile = Path.GetFileName(path);
+                job.TotalFiles++;
+                _repo.UpdateJob(job);
+
+                bool success = false;
+                const int maxRetries = 3;
+                for (int attempt = 1; attempt <= maxRetries; attempt++)
+                {
+                    try
+                    {
+                        await ProcessSingleAsync(job, path, token);
+                        success = true;
+                        _repo.RecordFileSuccess(job.JobId, path);
+                        job.ProcessedFiles.Add(path);
+                        job.FilesProcessed++;
+                        job.Progress = job.TotalFiles > 0 ? (double)job.FilesProcessed / job.TotalFiles : 1d;
+                        _repo.UpdateJob(job);
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        if (attempt == maxRetries)
+                        {
+                            _log.Error($"Watched file failed: {path}", ex);
+                            _repo.RecordFileFailure(job.JobId, path, ex.Message);
+                            job.Errors.Add(new FileProcessingError
+                            {
+                                FileName = Path.GetFileName(path),
+                                FilePath = path,
+                                ErrorMessage = ex.Message,
+                                Timestamp = DateTime.Now
+                            });
+                        }
+                        else
+                        {
+                            await Task.Delay(1000 * attempt, token);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Error($"Error in watch processing for {path}", ex);
+            }
+            finally
+            {
+                job.CurrentFile = string.Empty;
+                _repo.UpdateJob(job);
+            }
         }
     }
 }

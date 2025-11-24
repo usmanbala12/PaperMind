@@ -48,7 +48,8 @@ namespace PaperMind.Services.Implementations
                     EndTime TEXT NULL,
                     OcrQuality INTEGER NOT NULL,
                     OcrLanguage TEXT NOT NULL,
-                    PipelineJson TEXT NULL
+                    PipelineJson TEXT NULL,
+                    TriggerType INTEGER NOT NULL DEFAULT 0
                 );
                 
                 CREATE TABLE IF NOT EXISTS JobFileStatus (
@@ -69,6 +70,15 @@ namespace PaperMind.Services.Implementations
                 cmdAlter.ExecuteNonQuery();
             }
             catch { /* Ignore if exists */ }
+
+            // Migration: Add TriggerType if missing
+            try
+            {
+                using var cmdAlter = conn.CreateCommand();
+                cmdAlter.CommandText = "ALTER TABLE Jobs ADD COLUMN TriggerType INTEGER NOT NULL DEFAULT 0;";
+                cmdAlter.ExecuteNonQuery();
+            }
+            catch { /* Ignore if exists */ }
         }
 
         public void AddJob(ProcessingJob job)
@@ -79,10 +89,10 @@ namespace PaperMind.Services.Implementations
             cmd.CommandText = @"
                 INSERT INTO Jobs (
                     JobId, InputFolder, OutputFolder, Steps, Status, Progress,
-                    FilesProcessed, TotalFiles, StartTime, EndTime, OcrQuality, OcrLanguage, PipelineJson
+                    FilesProcessed, TotalFiles, StartTime, EndTime, OcrQuality, OcrLanguage, PipelineJson, TriggerType
                 ) VALUES (
                     @JobId, @InputFolder, @OutputFolder, @Steps, @Status, @Progress,
-                    @FilesProcessed, @TotalFiles, @StartTime, @EndTime, @OcrQuality, @OcrLanguage, @PipelineJson
+                    @FilesProcessed, @TotalFiles, @StartTime, @EndTime, @OcrQuality, @OcrLanguage, @PipelineJson, @TriggerType
                 );";
 
             BindAll(cmd, job);
@@ -107,7 +117,8 @@ namespace PaperMind.Services.Implementations
                     EndTime = @EndTime,
                     OcrQuality = @OcrQuality,
                     OcrLanguage = @OcrLanguage,
-                    PipelineJson = @PipelineJson
+                    PipelineJson = @PipelineJson,
+                    TriggerType = @TriggerType
                 WHERE JobId = @JobId;";
 
             BindAll(cmd, job);
@@ -194,6 +205,16 @@ namespace PaperMind.Services.Implementations
             cmd.ExecuteNonQuery();
         }
 
+        public void ClearJobHistory(Guid jobId)
+        {
+            using var conn = new SqliteConnection(_connectionString);
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM JobFileStatus WHERE JobId = @JobId";
+            cmd.Parameters.Add(new SqliteParameter("@JobId", SqliteType.Text) { Value = jobId.ToString() });
+            cmd.ExecuteNonQuery();
+        }
+
         public IEnumerable<ProcessingJob> GetAllJobs()
         {
             using var conn = new SqliteConnection(_connectionString);
@@ -228,6 +249,7 @@ namespace PaperMind.Services.Implementations
             cmd.Parameters.Add(new SqliteParameter("@OcrQuality", SqliteType.Integer) { Value = (int)job.OcrQuality });
             cmd.Parameters.Add(new SqliteParameter("@OcrLanguage", SqliteType.Text) { Value = job.OcrLanguage });
             cmd.Parameters.Add(new SqliteParameter("@PipelineJson", SqliteType.Text) { Value = (object?)job.PipelineJson ?? DBNull.Value });
+            cmd.Parameters.Add(new SqliteParameter("@TriggerType", SqliteType.Integer) { Value = (int)job.TriggerType });
         }
 
         private static ProcessingJob Map(SqliteDataReader r)
@@ -248,7 +270,8 @@ namespace PaperMind.Services.Implementations
                     : DateTime.Parse(r.GetString(r.GetOrdinal("EndTime")), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
                 OcrQuality = (OcrQuality)r.GetInt32(r.GetOrdinal("OcrQuality")),
                 OcrLanguage = r.GetString(r.GetOrdinal("OcrLanguage")),
-                PipelineJson = r.IsDBNull(r.GetOrdinal("PipelineJson")) ? null : r.GetString(r.GetOrdinal("PipelineJson"))
+                PipelineJson = r.IsDBNull(r.GetOrdinal("PipelineJson")) ? null : r.GetString(r.GetOrdinal("PipelineJson")),
+                TriggerType = r.GetOrdinal("TriggerType") >= 0 ? (JobTriggerType)r.GetInt32(r.GetOrdinal("TriggerType")) : JobTriggerType.Manual
             };
         }
         public void DeleteJob(Guid jobId)

@@ -54,6 +54,8 @@ namespace PaperMind.ViewModels
             StartCommand = ReactiveCommand.CreateFromTask(StartAsync, this.WhenAnyValue(vm => vm.Status, s => s != JobStatus.Running && s != JobStatus.Completed && s != JobStatus.CompletedWithErrors));
             StopCommand = ReactiveCommand.CreateFromTask(StopAsync, this.WhenAnyValue(vm => vm.Status, s => s == JobStatus.Running));
             ResumeCommand = ReactiveCommand.CreateFromTask(ResumeAsync, this.WhenAnyValue(vm => vm.Status, s => s == JobStatus.Cancelled || s == JobStatus.Failed || s == JobStatus.CompletedWithErrors));
+            RestartCommand = ReactiveCommand.CreateFromTask(RestartAsync, this.WhenAnyValue(vm => vm.Status, s => s == JobStatus.Completed || s == JobStatus.CompletedWithErrors || s == JobStatus.Failed || s == JobStatus.Cancelled));
+            DuplicateCommand = ReactiveCommand.CreateFromTask(DuplicateAsync);
 
             UpdateFromJob(_job, addLog: false);
             _pollTimer = new Timer(async _ => await PollAsync().ConfigureAwait(false), null, 500, 500);
@@ -67,9 +69,11 @@ namespace PaperMind.ViewModels
         public JobStatus Status => _job.Status;
         public bool IsRunning => Status == JobStatus.Running;
         public bool IsNotRunning => !IsRunning;
-        public bool ShowStart => Status == JobStatus.Pending || Status == JobStatus.Completed || Status == JobStatus.Failed || Status == JobStatus.CompletedWithErrors;
-        public bool ShowStop => Status == JobStatus.Running;
+        public bool ShowStart => Status == JobStatus.Pending;
+        public bool ShowStop => Status == JobStatus.Running || Status == JobStatus.Watching;
         public bool ShowResume => Status == JobStatus.Cancelled || Status == JobStatus.Failed || Status == JobStatus.CompletedWithErrors;
+        public bool ShowRestart => Status == JobStatus.Completed || Status == JobStatus.CompletedWithErrors || Status == JobStatus.Failed || Status == JobStatus.Cancelled;
+        public bool ShowDuplicate => true;
 
         public double ProgressPercent
         {
@@ -115,6 +119,8 @@ namespace PaperMind.ViewModels
         public ICommand StartCommand { get; }
         public ICommand StopCommand { get; }
         public ICommand ResumeCommand { get; }
+        public ICommand RestartCommand { get; }
+        public ICommand DuplicateCommand { get; }
 
         private async Task PollAsync()
         {
@@ -181,6 +187,8 @@ namespace PaperMind.ViewModels
             this.RaisePropertyChanged(nameof(ShowStart));
             this.RaisePropertyChanged(nameof(ShowStop));
             this.RaisePropertyChanged(nameof(ShowResume));
+            this.RaisePropertyChanged(nameof(ShowRestart));
+            this.RaisePropertyChanged(nameof(ShowDuplicate));
             this.RaisePropertyChanged(nameof(FilesProcessed));
             this.RaisePropertyChanged(nameof(TotalFiles));
             this.RaisePropertyChanged(nameof(ProgressPercent));
@@ -238,6 +246,27 @@ namespace PaperMind.ViewModels
             AddLog("Resume requested");
             _ = Task.Run(() => _jobs.StartJobAsync(_job));
             await Task.CompletedTask;
+        }
+
+        private async Task RestartAsync()
+        {
+            if (Status == JobStatus.Running) return;
+            AddLog("Restart requested");
+            await _jobs.RestartJobAsync(_job.JobId);
+        }
+
+        private async Task DuplicateAsync()
+        {
+            try
+            {
+                var newJob = await _jobs.DuplicateJobAsync(_job.JobId);
+                // Ideally we should navigate to the new job, but for now we just notify
+                AddLog($"Job duplicated. New Job ID: {newJob.JobId}");
+            }
+            catch (Exception ex)
+            {
+                AddLog($"Failed to duplicate job: {ex.Message}");
+            }
         }
 
         public void Dispose()

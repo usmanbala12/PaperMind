@@ -13,6 +13,8 @@
         <Button Content="▶ Start" Command="{Binding StartCommand}" IsVisible="{Binding ShowStart}"/>
         <Button Content="■ Stop" Command="{Binding StopCommand}" IsVisible="{Binding ShowStop}" Background="#DC3545" Foreground="White"/>
         <Button Content="⏵ Resume" Command="{Binding ResumeCommand}" IsVisible="{Binding ShowResume}"/>
+        <Button Content="↻ Restart" Command="{Binding RestartCommand}" IsVisible="{Binding ShowRestart}"/>
+        <Button Content="❐ Duplicate" Command="{Binding DuplicateCommand}" IsVisible="{Binding ShowDuplicate}"/>
       </StackPanel>
     </Grid>
 

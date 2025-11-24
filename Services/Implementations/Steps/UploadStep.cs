@@ -40,11 +40,42 @@ namespace PaperMind.Services.Implementations.Steps
                 try
                 {
                     var storageService = _storageFactory.Create(provider);
-                    // Use the filename as the remote path
-                    var remotePath = System.IO.Path.GetFileName(path);
 
-                    await storageService.UploadAsync(path, remotePath).ConfigureAwait(false);
-                    context.Logger.Info($"[Job {context.Job.JobId}] Uploaded {path} to {provider}");
+                    // Determine target path
+                    // If "TargetFolder" is specified in config, use it.
+                    // Otherwise, we might default to just the filename (which services might treat as root or global default fallback).
+                    // But per plan, we want to support explicit target folder.
+
+                    var targetFolder = config.Parameters.TryGetValue("TargetFolder", out var tf) ? tf : null;
+                    var fileName = System.IO.Path.GetFileName(path);
+
+                    string remotePath;
+                    if (!string.IsNullOrWhiteSpace(targetFolder))
+                    {
+                        // Normalize separators
+                        targetFolder = targetFolder.Replace('\\', '/');
+                        if (!targetFolder.EndsWith("/")) targetFolder += "/";
+                        remotePath = targetFolder + fileName;
+                    }
+                    else
+                    {
+                        // No folder specified, just use filename. 
+                        // Services will handle this (e.g. Dropbox might put in root, GDrive might use global default).
+                        remotePath = fileName;
+                    }
+
+                    // Extract credentials from step parameters
+                    var storageConfig = new StorageRequestConfig
+                    {
+                        DropboxAccessToken = config.Parameters.TryGetValue("DropboxAccessToken", out var dbToken) ? dbToken : null,
+                        GoogleDriveClientId = config.Parameters.TryGetValue("GoogleDriveClientId", out var gdId) ? gdId : null,
+                        GoogleDriveClientSecret = config.Parameters.TryGetValue("GoogleDriveClientSecret", out var gdSecret) ? gdSecret : null,
+                        OneDriveClientId = config.Parameters.TryGetValue("OneDriveClientId", out var odId) ? odId : null,
+                        OneDriveTenantId = config.Parameters.TryGetValue("OneDriveTenantId", out var odTenant) ? odTenant : null
+                    };
+
+                    await storageService.UploadAsync(path, remotePath, storageConfig).ConfigureAwait(false);
+                    context.Logger.Info($"[Job {context.Job.JobId}] Uploaded {path} to {provider} at {remotePath}");
                 }
                 catch (Exception ex)
                 {

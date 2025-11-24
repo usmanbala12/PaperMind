@@ -1,0 +1,282 @@
+
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PaperMind.Views.JobViewForm"
+             x:Name="Root"
+             xmlns:vm="using:PaperMind.ViewModels"
+             xmlns:conv="using:PaperMind.Converters"
+             x:DataType="vm:JobFormViewModel">
+  <UserControl.Resources>
+    <conv:StepTypeVisibilityConverter x:Key="StepTypeVisibilityConverter"/>
+    <conv:EnumMatchConverter x:Key="EnumMatchConverter"/>
+  </UserControl.Resources>
+  
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <Grid Background="#F8F9FA">
+          <!-- Centered Card -->
+          <Border Background="White" 
+                  BorderBrush="#E1E4E8" 
+                  BorderThickness="1" 
+                  CornerRadius="12" 
+                  Margin="24" 
+                  Padding="32"
+                  MaxWidth="900"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Top"
+                  BoxShadow="0 4 12 0 #10000000">
+              
+              <StackPanel Spacing="24">
+                  <!-- Header -->
+                  <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Spacing="4">
+                          <TextBlock Text="{Binding HeaderText}" FontSize="28" FontWeight="Bold" Foreground="#24292E"/>
+                          <TextBlock Text="Configure your document processing pipeline" FontSize="16" Foreground="#586069"/>
+                      </StackPanel>
+                      <Button Grid.Column="1" 
+                              Content="Cancel" 
+                              Command="{Binding CancelCommand}" 
+                              Background="Transparent" 
+                              BorderThickness="0" 
+                              Foreground="#586069" 
+                              FontWeight="SemiBold"
+                              Cursor="Hand"/>
+                  </Grid>
+
+                  <Separator Background="#E1E4E8" Height="1"/>
+
+                  <!-- Trigger Type -->
+                  <StackPanel Spacing="8">
+                      <TextBlock Text="Execution Mode" FontWeight="SemiBold" Foreground="#24292E"/>
+                      <ComboBox ItemsSource="{Binding AvailableTriggerTypes}" SelectedItem="{Binding TriggerType}" HorizontalAlignment="Left" Width="200"/>
+                      <TextBlock Text="Manual: Run once. Watch: Monitor input folder for new files." FontSize="12" Foreground="#6A737D"/>
+                  </StackPanel>
+
+                  <Separator Background="#E1E4E8" Height="1"/>
+
+                  <!-- Input / Output Section -->
+                  <Grid ColumnDefinitions="*,24,*" RowDefinitions="Auto,Auto">
+                      <!-- Input -->
+                      <StackPanel Grid.Column="0" Spacing="8">
+                          <TextBlock Text="Input Source" FontWeight="SemiBold" Foreground="#24292E"/>
+                          <Grid ColumnDefinitions="*,Auto">
+                              <Border Grid.Column="0" Background="#F6F8FA" BorderBrush="#D1D5DA" BorderThickness="1,1,0,1" CornerRadius="6,0,0,6" Padding="12,10">
+                                  <TextBlock Text="{Binding InputFolder}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center">
+                                      <TextBlock.Styles>
+                                          <Style Selector="TextBlock[Text='']">
+                                              <Setter Property="Text" Value="Select input folder..."/>
+                                              <Setter Property="Foreground" Value="#959DA5"/>
+                                          </Style>
+                                      </TextBlock.Styles>
+                                  </TextBlock>
+                              </Border>
+                              <Button Grid.Column="1" Command="{Binding SelectInputFolderCommand}" 
+                                      Background="#F6F8FA" BorderBrush="#D1D5DA" BorderThickness="0,1,1,1" CornerRadius="0,6,6,0" 
+                                      Padding="12,10" Cursor="Hand">
+                                  <TextBlock Text="Browse" FontWeight="SemiBold" Foreground="#0366D6"/>
+                              </Button>
+                          </Grid>
+                          <TextBlock Text="Folder containing documents to process" FontSize="12" Foreground="#6A737D"/>
+                      </StackPanel>
+
+                      <!-- Output -->
+                      <StackPanel Grid.Column="2" Spacing="8">
+                          <TextBlock Text="Output Destination" FontWeight="SemiBold" Foreground="#24292E"/>
+                          <Grid ColumnDefinitions="*,Auto">
+                              <Border Grid.Column="0" Background="#F6F8FA" BorderBrush="#D1D5DA" BorderThickness="1,1,0,1" CornerRadius="6,0,0,6" Padding="12,10">
+                                  <TextBlock Text="{Binding OutputFolder}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center">
+                                      <TextBlock.Styles>
+                                          <Style Selector="TextBlock[Text='']">
+                                              <Setter Property="Text" Value="Select output folder..."/>
+                                              <Setter Property="Foreground" Value="#959DA5"/>
+                                          </Style>
+                                      </TextBlock.Styles>
+                                  </TextBlock>
+                              </Border>
+                              <Button Grid.Column="1" Command="{Binding SelectOutputFolderCommand}" 
+                                      Background="#F6F8FA" BorderBrush="#D1D5DA" BorderThickness="0,1,1,1" CornerRadius="0,6,6,0" 
+                                      Padding="12,10" Cursor="Hand">
+                                  <TextBlock Text="Browse" FontWeight="SemiBold" Foreground="#0366D6"/>
+                              </Button>
+                          </Grid>
+                          <TextBlock Text="Where processed files will be saved" FontSize="12" Foreground="#6A737D"/>
+                      </StackPanel>
+                  </Grid>
+
+                  <Separator Background="#E1E4E8" Height="1"/>
+
+                  <!-- Pipeline Steps -->
+                  <StackPanel Spacing="16">
+                      <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="2">
+                              <TextBlock Text="Processing Pipeline" FontSize="18" FontWeight="Bold" Foreground="#24292E"/>
+                              <TextBlock Text="Define the steps to process your documents" FontSize="14" Foreground="#586069"/>
+                          </StackPanel>
+                          
+                          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                              <ComboBox ItemsSource="{Binding AvailableStepTypes}" SelectedItem="{Binding SelectedStepTypeToAdd}" Width="200" Height="36" CornerRadius="6"/>
+                              <Button Command="{Binding AddStepCommand}" Background="#0366D6" Foreground="White" CornerRadius="6" Padding="12,0" Height="36" Cursor="Hand">
+                                  <StackPanel Orientation="Horizontal" Spacing="6">
+                                      <TextBlock Text="+" FontWeight="Bold"/>
+                                      <TextBlock Text="Add Step" FontWeight="SemiBold"/>
+                                  </StackPanel>
+                              </Button>
+                          </StackPanel>
+                      </Grid>
+
+                      <ItemsControl ItemsSource="{Binding PipelineSteps}">
+                          <ItemsControl.ItemTemplate>
+                              <DataTemplate>
+                                  <Border Background="White" BorderBrush="#E1E4E8" BorderThickness="1" CornerRadius="8" Margin="0,0,0,12" BoxShadow="0 1 3 0 #10000000">
+                                      <Grid RowDefinitions="Auto,Auto">
+                                          <!-- Step Header -->
+                                          <Border Grid.Row="0" Background="#F6F8FA" BorderBrush="#E1E4E8" BorderThickness="0,0,0,1" CornerRadius="8,8,0,0" Padding="16,12">
+                                              <Grid ColumnDefinitions="Auto,*,Auto">
+                                                  <Border Grid.Column="0" Background="#E1E4E8" CornerRadius="4" Padding="8,4" Margin="0,0,12,0">
+                                                      <TextBlock Text="{Binding StepType}" FontSize="12" FontWeight="Bold" Foreground="#586069"/>
+                                                  </Border>
+                                                  <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontWeight="Bold" VerticalAlignment="Center" Foreground="#24292E"/>
+                                                  
+                                                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+                                                      <Button Command="{Binding DataContext.MoveStepUpCommand, ElementName=Root}" CommandParameter="{Binding}" 
+                                                              Background="Transparent" BorderThickness="0" Padding="8" ToolTip.Tip="Move Up">
+                                                          <TextBlock Text="↑" FontWeight="Bold"/>
+                                                      </Button>
+                                                      <Button Command="{Binding DataContext.MoveStepDownCommand, ElementName=Root}" CommandParameter="{Binding}" 
+                                                              Background="Transparent" BorderThickness="0" Padding="8" ToolTip.Tip="Move Down">
+                                                          <TextBlock Text="↓" FontWeight="Bold"/>
+                                                      </Button>
+                                                      <Button Command="{Binding DataContext.RemoveStepCommand, ElementName=Root}" CommandParameter="{Binding}" 
+                                                              Background="Transparent" BorderThickness="0" Padding="8" Foreground="#CB2431" ToolTip.Tip="Remove Step">
+                                                          <TextBlock Text="✕" FontWeight="Bold"/>
+                                                      </Button>
+                                                  </StackPanel>
+                                              </Grid>
+                                          </Border>
+                                          
+                                          <!-- Step Content -->
+                                          <StackPanel Grid.Row="1" Margin="16">
+                                              <!-- Config: OCR -->
+                                              <StackPanel IsVisible="{Binding StepType, Converter={StaticResource StepTypeVisibilityConverter}, ConverterParameter='OcrToSearchablePdf'}" Spacing="12">
+                                                  <Grid ColumnDefinitions="Auto,16,Auto">
+                                                      <StackPanel Grid.Column="0" Spacing="6">
+                                                          <TextBlock Text="Language" FontWeight="SemiBold" FontSize="12"/>
+                                                          <ComboBox ItemsSource="{Binding AvailableLanguages}" SelectedItem="{Binding OcrLanguage}" Width="150"/>
+                                                      </StackPanel>
+                                                      <StackPanel Grid.Column="2" Spacing="6">
+                                                          <TextBlock Text="Quality" FontWeight="SemiBold" FontSize="12"/>
+                                                          <ComboBox ItemsSource="{Binding AvailableQualities}" SelectedItem="{Binding OcrQuality}" Width="150"/>
+                                                      </StackPanel>
+                                                  </Grid>
+                                              </StackPanel>
+                                              
+                                              <!-- Config: Upload -->
+                                              <StackPanel IsVisible="{Binding StepType, Converter={StaticResource StepTypeVisibilityConverter}, ConverterParameter='UploadToCloud'}" Spacing="12">
+                                                  <Grid ColumnDefinitions="*,16,*">
+                                                      <StackPanel Grid.Column="0" Spacing="6">
+                                                          <TextBlock Text="Cloud Provider" FontWeight="SemiBold" FontSize="12"/>
+                                                          <ComboBox ItemsSource="{Binding AvailableProviders}" SelectedItem="{Binding UploadProvider}" HorizontalAlignment="Stretch"/>
+                                                      </StackPanel>
+                                                      <StackPanel Grid.Column="2" Spacing="6">
+                                                          <TextBlock Text="Target Folder (Optional)" FontWeight="SemiBold" FontSize="12"/>
+                                                          <TextBox Text="{Binding UploadTargetPath}" Watermark="/MyDocuments/Scans" />
+                                                      </StackPanel>
+                                                  </Grid>
+                                                  
+                                                  <!-- Dropbox Credentials -->
+                                                  <StackPanel IsVisible="{Binding UploadProvider, Converter={StaticResource EnumMatchConverter}, ConverterParameter='Dropbox'}" Spacing="6">
+                                                      <TextBlock Text="Access Token Override (Optional)" FontWeight="SemiBold" FontSize="12"/>
+                                                      <TextBox Text="{Binding DropboxAccessToken}" PasswordChar="•" Watermark="Leave empty to use global setting"/>
+                                                  </StackPanel>
+
+                                                  <!-- Google Drive Credentials -->
+                                                  <StackPanel IsVisible="{Binding UploadProvider, Converter={StaticResource EnumMatchConverter}, ConverterParameter='GoogleDrive'}" Spacing="6">
+                                                      <Grid ColumnDefinitions="*,16,*">
+                                                          <StackPanel Grid.Column="0" Spacing="6">
+                                                              <TextBlock Text="Client ID Override" FontWeight="SemiBold" FontSize="12"/>
+                                                              <TextBox Text="{Binding GoogleDriveClientId}" Watermark="Leave empty to use global setting"/>
+                                                          </StackPanel>
+                                                          <StackPanel Grid.Column="2" Spacing="6">
+                                                              <TextBlock Text="Client Secret Override" FontWeight="SemiBold" FontSize="12"/>
+                                                              <TextBox Text="{Binding GoogleDriveClientSecret}" PasswordChar="•" Watermark="Leave empty to use global setting"/>
+                                                          </StackPanel>
+                                                      </Grid>
+                                                  </StackPanel>
+
+                                                  <!-- OneDrive Credentials -->
+                                                  <StackPanel IsVisible="{Binding UploadProvider, Converter={StaticResource EnumMatchConverter}, ConverterParameter='OneDrive'}" Spacing="6">
+                                                      <Grid ColumnDefinitions="*,16,*">
+                                                          <StackPanel Grid.Column="0" Spacing="6">
+                                                              <TextBlock Text="Client ID Override" FontWeight="SemiBold" FontSize="12"/>
+                                                              <TextBox Text="{Binding OneDriveClientId}" Watermark="Leave empty to use global setting"/>
+                                                          </StackPanel>
+                                                          <StackPanel Grid.Column="2" Spacing="6">
+                                                              <TextBlock Text="Tenant ID Override" FontWeight="SemiBold" FontSize="12"/>
+                                                              <TextBox Text="{Binding OneDriveTenantId}" Watermark="Leave empty to use global setting"/>
+                                                          </StackPanel>
+                                                      </Grid>
+                                                  </StackPanel>
+                                              </StackPanel>
+                                              
+                                              <!-- Config: Rename -->
+                                              <StackPanel IsVisible="{Binding StepType, Converter={StaticResource StepTypeVisibilityConverter}, ConverterParameter='LlmRename'}" Spacing="12">
+                                                  <Grid ColumnDefinitions="*,16,*">
+                                                      <StackPanel Grid.Column="0" Spacing="6">
+                                                          <TextBlock Text="LLM Provider" FontWeight="SemiBold" FontSize="12"/>
+                                                          <ComboBox ItemsSource="{Binding AvailableLlmProviders}" SelectedItem="{Binding LlmProvider}" HorizontalAlignment="Stretch"/>
+                                                      </StackPanel>
+                                                      <StackPanel Grid.Column="2" Spacing="6">
+                                                          <TextBlock Text="Model Name (Optional)" FontWeight="SemiBold" FontSize="12"/>
+                                                          <TextBox Text="{Binding LlmModel}" Watermark="e.g. gpt-4o" />
+                                                      </StackPanel>
+                                                  </Grid>
+                                                  <StackPanel Spacing="6">
+                                                      <TextBlock Text="API Key Override (Optional)" FontWeight="SemiBold" FontSize="12"/>
+                                                      <TextBox Text="{Binding LlmApiKey}" PasswordChar="•" Watermark="Leave empty to use global setting" />
+                                                  </StackPanel>
+                                                  
+                                                  <Border Background="#F1F8FF" BorderBrush="#C8E1FF" BorderThickness="1" CornerRadius="6" Padding="12">
+                                                      <StackPanel Orientation="Horizontal" Spacing="8">
+                                                          <TextBlock Text="ℹ️" VerticalAlignment="Center"/>
+                                                          <TextBlock Text="Uses global prompt setting. Override provider/model above." Foreground="#0366D6" FontStyle="Italic"/>
+                                                      </StackPanel>
+                                                  </Border>
+                                              </StackPanel>
+                                          </StackPanel>
+                                      </Grid>
+                                  </Border>
+                              </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      
+                      <Border IsVisible="{Binding !PipelineSteps.Count}" Background="#F6F8FA" BorderBrush="#D1D5DA" BorderThickness="1" CornerRadius="8" Padding="32" HorizontalAlignment="Stretch">
+                          <StackPanel HorizontalAlignment="Center" Spacing="8">
+                              <TextBlock Text="No steps added yet" FontWeight="Bold" Foreground="#586069" HorizontalAlignment="Center"/>
+                              <TextBlock Text="Add a step above to begin configuring your pipeline." Foreground="#6A737D" HorizontalAlignment="Center"/>
+                          </StackPanel>
+                      </Border>
+                  </StackPanel>
+
+                  <Separator Background="#E1E4E8" Height="1"/>
+
+                  <!-- Footer Actions -->
+                  <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+                      <Button Content="{Binding CreateButtonText}" 
+                              Command="{Binding SaveJobCommand}" 
+                              IsEnabled="{Binding CanSave}" 
+                              Height="44" Padding="24,0" CornerRadius="6" 
+                              Background="#2EA44F" Foreground="White" FontWeight="Bold" FontSize="16"
+                              Cursor="Hand"/>
+                      
+                      <Button Content="▶️ Start Job Now" 
+                              Command="{Binding StartJobCommand}" 
+                              IsEnabled="{Binding CanStart}" 
+                              IsVisible="{Binding !IsEditing}"
+                              Height="44" Padding="24,0" CornerRadius="6" 
+                              Background="#0366D6" Foreground="White" FontWeight="Bold" FontSize="16"
+                              Cursor="Hand"/>
+                  </StackPanel>
+              </StackPanel>
+          </Border>
+      </Grid>
+  </ScrollViewer>
+</UserControl>

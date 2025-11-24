@@ -12,6 +12,8 @@ namespace PaperMind.Models
         // Selected steps for this job (combinable)
         public ProcessingStep Steps { get; set; } = ProcessingStep.OcrToSearchablePdf | ProcessingStep.LlmRename;
 
+        public JobTriggerType TriggerType { get; set; } = JobTriggerType.Manual;
+
         public JobStatus Status { get; set; }
         public double Progress { get; set; }
         public int FilesProcessed { get; set; }

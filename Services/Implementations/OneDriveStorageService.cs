@@ -37,9 +37,9 @@ namespace PaperMind.Services.Implementations
             }
         }
 
-        public async Task UploadAsync(string filePath, string destinationPath)
+        public async Task UploadAsync(string filePath, string destinationPath, StorageRequestConfig? config = null)
         {
-            var credential = GetCredential();
+            var credential = GetCredential(config);
             var graphClient = new GraphServiceClient(credential, new[] { "Files.ReadWrite" });
 
             var folderPath = _config.Get("StorageConfig_OneDriveFolderPath") ?? "";
@@ -70,10 +70,10 @@ namespace PaperMind.Services.Implementations
             _log.Info($"Uploaded file to OneDrive: {destinationPath}");
         }
 
-        private InteractiveBrowserCredential GetCredential()
+        private InteractiveBrowserCredential GetCredential(StorageRequestConfig? config = null)
         {
-            var clientId = _credentials.GetCredential("OneDrive_ClientId");
-            var tenantId = _credentials.GetCredential("OneDrive_TenantId");
+            var clientId = config?.OneDriveClientId ?? _credentials.GetCredential("OneDrive_ClientId");
+            var tenantId = config?.OneDriveTenantId ?? _credentials.GetCredential("OneDrive_TenantId");
 
             if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(tenantId))
             {

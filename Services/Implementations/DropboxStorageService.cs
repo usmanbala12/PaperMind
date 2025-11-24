@@ -89,9 +89,9 @@ namespace PaperMind.Services.Implementations
             }
         }
 
-        public async Task UploadAsync(string filePath, string destinationPath)
+        public async Task UploadAsync(string filePath, string destinationPath, StorageRequestConfig? config = null)
         {
-            var accessToken = _credentials.GetCredential("Dropbox_AccessToken");
+            var accessToken = config?.DropboxAccessToken ?? _credentials.GetCredential("Dropbox_AccessToken");
 
             if (string.IsNullOrWhiteSpace(accessToken))
             {
@@ -100,15 +100,8 @@ namespace PaperMind.Services.Implementations
 
             using var client = new DropboxClient(accessToken);
 
-            var folderPath = _config.Get("StorageConfig_DropboxFolderPath") ?? "";
-            // Ensure folder path starts with / if not empty
-            if (!string.IsNullOrWhiteSpace(folderPath) && !folderPath.StartsWith("/"))
-            {
-                folderPath = "/" + folderPath;
-            }
-
-            var fileName = Path.GetFileName(destinationPath);
-            var dropboxPath = folderPath + "/" + fileName;
+            var dropboxPath = destinationPath;
+            if (!dropboxPath.StartsWith("/")) dropboxPath = "/" + dropboxPath;
             if (dropboxPath.StartsWith("//")) dropboxPath = dropboxPath.Substring(1);
 
             using var stream = new FileStream(filePath, FileMode.Open);

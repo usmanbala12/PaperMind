@@ -4,7 +4,7 @@ namespace PaperMind.Services.Abstractions
 {
     public interface IStorageService
     {
-        Task UploadAsync(string filePath, string destinationPath);
         Task<bool> AuthenticateAsync();
+        Task UploadAsync(string filePath, string destinationPath, PaperMind.Services.Implementations.StorageRequestConfig? config = null);
     }
 }

@@ -17,6 +17,8 @@ namespace PaperMind.Views
         private JobsViewModel? _jobsVm;
         private JobView? _jobView;
         private JobViewModel? _jobVm;
+        private JobViewForm? _jobViewForm;
+        private JobFormViewModel? _jobFormVm;
         private SettingsView? _settingsView;
         private SettingsViewModel? _settingsVm;
         private LogsView? _logsView;
@@ -49,7 +51,11 @@ namespace PaperMind.Views
             _logsTabHost = this.FindControl<ContentControl>("LogsTabHost");
 
             // Initialize Jobs tab content
-            _jobsVm = new JobsViewModel(jobService, navigateToJob: ShowJobDetails);
+            _jobsVm = new JobsViewModel(
+                jobService,
+                navigateToJob: ShowJobDetails,
+                navigateToCreateJob: ShowCreateJob,
+                navigateToEditJob: ShowEditJob);
             _jobsView = new JobsView { DataContext = _jobsVm };
             if (_jobsTabHost is not null)
             {
@@ -94,6 +100,8 @@ namespace PaperMind.Views
             _jobVm?.Dispose();
             _jobVm = null;
             _jobView = null;
+            _jobFormVm = null;
+            _jobViewForm = null;
 
             // Ensure Jobs tab shows the jobs view
             if (_jobsTabHost is not null && _jobsView is not null)
@@ -105,6 +113,41 @@ namespace PaperMind.Views
             if (_mainTabs is not null)
             {
                 _mainTabs.SelectedIndex = 1;
+            }
+        }
+
+        private void ShowCreateJob()
+        {
+            var jobService = App.Services.GetRequiredService<IProcessingJobService>();
+
+            _jobFormVm = new JobFormViewModel(
+                jobService,
+                navigateBack: ShowJobsList,
+                navigateToJob: ShowJobDetails);
+
+            _jobViewForm = new JobViewForm { DataContext = _jobFormVm };
+
+            if (_jobsTabHost is not null)
+            {
+                _jobsTabHost.Content = _jobViewForm;
+            }
+        }
+
+        private void ShowEditJob(ProcessingJob job)
+        {
+            var jobService = App.Services.GetRequiredService<IProcessingJobService>();
+
+            _jobFormVm = new JobFormViewModel(
+                jobService,
+                navigateBack: ShowJobsList,
+                navigateToJob: ShowJobDetails,
+                jobToEdit: job);
+
+            _jobViewForm = new JobViewForm { DataContext = _jobFormVm };
+
+            if (_jobsTabHost is not null)
+            {
+                _jobsTabHost.Content = _jobViewForm;
             }
         }
 

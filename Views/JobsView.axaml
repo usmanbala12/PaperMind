@@ -8,130 +8,14 @@
   <UserControl.Resources>
     <conv:StepTypeVisibilityConverter x:Key="StepTypeVisibilityConverter"/>
   </UserControl.Resources>
-  <Grid ColumnDefinitions="340,*" Background="#F8F9FA">
-    <!-- Left: New Job Form -->
-    <Border Grid.Column="0" Background="White" BorderBrush="#E1E4E8" BorderThickness="0,0,1,0" Padding="24">
-      <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="16">
-          <StackPanel Spacing="4">
-            <TextBlock Text="{Binding HeaderText}" FontSize="20" FontWeight="Bold"/>
-            <TextBlock Text="Select folders, steps and save or start" Foreground="#6A737D"/>
-          </StackPanel>
-
-          <Button Content="Cancel Edit" Command="{Binding CancelEditCommand}" IsVisible="{Binding IsEditing}" Background="#DC3545" Foreground="White" HorizontalAlignment="Right" Margin="0,-40,0,0"/>
-
-          <Separator Background="#E1E4E8" Height="1"/>
-
-          <!-- Input -->
-          <StackPanel Spacing="6">
-            <TextBlock Text="Input Folder" FontWeight="SemiBold"/>
-            <Grid ColumnDefinitions="*,Auto">
-              <Border Grid.Column="0" Background="#F6F8FA" BorderBrush="#D1D5DA" BorderThickness="1" CornerRadius="6" Padding="10,8">
-                <TextBlock Text="{Binding InputFolder}" TextTrimming="CharacterEllipsis">
-                  <TextBlock.Styles>
-                    <Style Selector="TextBlock[Text='']">
-                      <Setter Property="Text" Value="No folder selected"/>
-                      <Setter Property="Foreground" Value="#959DA5"/>
-                    </Style>
-                  </TextBlock.Styles>
-                </TextBlock>
-              </Border>
-              <Button Grid.Column="1" Content="📂" Command="{Binding SelectInputFolderCommand}" Width="40" Height="34" Margin="6,0,0,0" Background="#0366D6" Foreground="White" CornerRadius="6"/>
-            </Grid>
-          </StackPanel>
-
-          <!-- Output -->
-          <StackPanel Spacing="6">
-            <TextBlock Text="Output Folder" FontWeight="SemiBold"/>
-            <Grid ColumnDefinitions="*,Auto">
-              <Border Grid.Column="0" Background="#F6F8FA" BorderBrush="#D1D5DA" BorderThickness="1" CornerRadius="6" Padding="10,8">
-                <TextBlock Text="{Binding OutputFolder}" TextTrimming="CharacterEllipsis">
-                  <TextBlock.Styles>
-                    <Style Selector="TextBlock[Text='']">
-                      <Setter Property="Text" Value="No folder selected"/>
-                      <Setter Property="Foreground" Value="#959DA5"/>
-                    </Style>
-                  </TextBlock.Styles>
-                </TextBlock>
-              </Border>
-              <Button Grid.Column="1" Content="📂" Command="{Binding SelectOutputFolderCommand}" Width="40" Height="34" Margin="6,0,0,0" Background="#0366D6" Foreground="White" CornerRadius="6"/>
-            </Grid>
-          </StackPanel>
-
-          <Separator Background="#E1E4E8" Height="1"/>
-
-          <!-- Steps -->
-          <StackPanel Spacing="6">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Text="Pipeline Steps" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                <StackPanel Orientation="Horizontal" Spacing="4" Grid.Column="1">
-                    <ComboBox ItemsSource="{Binding AvailableStepTypes}" SelectedItem="{Binding SelectedStepTypeToAdd}" Width="160"/>
-                    <Button Content="+" Command="{Binding AddStepCommand}" Width="30"/>
-                </StackPanel>
-            </Grid>
-            
-            <ItemsControl ItemsSource="{Binding PipelineSteps}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Background="#F6F8FA" BorderBrush="#D1D5DA" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,8">
-                            <StackPanel Spacing="8">
-                                <!-- Header -->
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" VerticalAlignment="Center"/>
-                                    <StackPanel Orientation="Horizontal" Spacing="4" Grid.Column="1">
-                                        <Button Content="↑" Command="{Binding DataContext.MoveStepUpCommand, ElementName=Root}" CommandParameter="{Binding}" Padding="4,2" FontSize="10"/>
-                                        <Button Content="↓" Command="{Binding DataContext.MoveStepDownCommand, ElementName=Root}" CommandParameter="{Binding}" Padding="4,2" FontSize="10"/>
-                                        <Button Content="✕" Command="{Binding DataContext.RemoveStepCommand, ElementName=Root}" CommandParameter="{Binding}" Padding="4,2" FontSize="10" Foreground="#DC3545"/>
-                                    </StackPanel>
-                                </Grid>
-                                
-                                <!-- Config: OCR -->
-                                <StackPanel IsVisible="{Binding StepType, Converter={StaticResource StepTypeVisibilityConverter}, ConverterParameter='OcrToSearchablePdf'}" Spacing="6">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Language:" VerticalAlignment="Center" Width="70"/>
-                                        <ComboBox ItemsSource="{Binding AvailableLanguages}" SelectedItem="{Binding OcrLanguage}" Width="120"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Quality:" VerticalAlignment="Center" Width="70"/>
-                                        <ComboBox ItemsSource="{Binding AvailableQualities}" SelectedItem="{Binding OcrQuality}" Width="120"/>
-                                    </StackPanel>
-                                </StackPanel>
-                                
-                                <!-- Config: Upload -->
-                                <StackPanel IsVisible="{Binding StepType, Converter={StaticResource StepTypeVisibilityConverter}, ConverterParameter='UploadToCloud'}" Spacing="6">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Provider:" VerticalAlignment="Center" Width="70"/>
-                                        <ComboBox ItemsSource="{Binding AvailableProviders}" SelectedItem="{Binding UploadProvider}" Width="120"/>
-                                    </StackPanel>
-                                </StackPanel>
-                                
-                                <!-- Config: Rename -->
-                                <StackPanel IsVisible="{Binding StepType, Converter={StaticResource StepTypeVisibilityConverter}, ConverterParameter='LlmRename'}" Spacing="6">
-                                    <TextBlock Text="Uses default prompt from settings." FontStyle="Italic" Foreground="Gray"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </StackPanel>
-
-          <!-- Actions -->
-          <StackPanel Spacing="8">
-            <Button Content="{Binding CreateButtonText}" Command="{Binding SaveJobCommand}" IsEnabled="{Binding CanSave}" Height="40" CornerRadius="6" Background="#6f42c1" Foreground="White"/>
-            <Button Content="▶️ Start Job" Command="{Binding StartJobCommand}" IsEnabled="{Binding CanStart}" Height="44" CornerRadius="6" Background="#28A745" Foreground="White" IsVisible="{Binding !IsEditing}"/>
-          </StackPanel>
-        </StackPanel>
-      </ScrollViewer>
-    </Border>
-
-    <!-- Right: Jobs List -->
-    <Grid Grid.Column="1" Margin="24" RowDefinitions="Auto,*">
-      <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+  
+  <Grid Margin="24" RowDefinitions="Auto,*">
+      <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto">
         <TextBlock Text="Jobs" FontSize="24" FontWeight="Bold"/>
-        <Button Grid.Column="1" Content="Refresh" Command="{Binding RefreshJobsCommand}"/>
+        <Button Grid.Column="1" Content="Create New Job" Command="{Binding CreateJobCommand}" Margin="0,0,12,0" Background="#28A745" Foreground="White"/>
+        <Button Grid.Column="2" Content="Refresh" Command="{Binding RefreshJobsCommand}"/>
       </Grid>
-      <Border Grid.Row="1" Background="White" BorderBrush="#E1E4E8" BorderThickness="1" CornerRadius="8">
+      <Border Grid.Row="1" Background="White" BorderBrush="#E1E4E8" BorderThickness="1" CornerRadius="8" Margin="0,12,0,0">
         <ScrollViewer>
           <ListBox ItemsSource="{Binding Jobs}" SelectedItem="{Binding SelectedJob, Mode=OneWayToSource}">
             <ListBox.ItemTemplate>
@@ -155,6 +39,5 @@
           </ListBox>
         </ScrollViewer>
       </Border>
-    </Grid>
   </Grid>
 </UserControl>

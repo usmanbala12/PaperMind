@@ -37,9 +37,9 @@ namespace PaperMind.Services.Implementations
             }
         }
 
-        public async Task UploadAsync(string filePath, string destinationPath)
+        public async Task UploadAsync(string filePath, string destinationPath, StorageRequestConfig? config = null)
         {
-            var credential = await GetCredentialAsync();
+            var credential = await GetCredentialAsync(config);
 
             var service = new DriveService(new BaseClientService.Initializer()
             {
@@ -47,12 +47,32 @@ namespace PaperMind.Services.Implementations
                 ApplicationName = "PaperMind",
             });
 
-            var folderId = _config.Get("StorageConfig_GoogleDriveFolderId");
+            // destinationPath is treated as the Target Folder ID for Google Drive
+            // If it's just a filename (no path separators), we might assume it's the file name and we use the global folder.
+            // But the contract says "destinationPath" is the full target. 
+            // For GDrive, let's assume destinationPath passed from UploadStep contains the Folder ID if overridden.
+            // However, UploadStep passes "remotePath".
+            // Let's change the contract slightly: UploadStep will pass the FolderID in destinationPath if it's a folder, or we need a way to distinguish.
+
+            // Actually, let's look at how UploadStep calls it. It calls UploadAsync(path, remotePath).
+            // We will update UploadStep to pass the FolderId as the "destinationPath" directory part? No, that's messy.
+
+            // Better approach for GDrive: 
+            // The `destinationPath` argument in UploadAsync is usually "Folder/Filename.pdf".
+            // For GDrive, "Folder" is an ID. 
+            // So we will extract the directory name from destinationPath and use it as FolderID.
+
+            var targetFolderId = Path.GetDirectoryName(destinationPath);
+            if (string.IsNullOrWhiteSpace(targetFolderId) || targetFolderId == "\\" || targetFolderId == "/")
+            {
+                // Fallback to global default if no folder specified in the path
+                targetFolderId = _config.Get("StorageConfig_GoogleDriveFolderId");
+            }
 
             var fileMetadata = new Google.Apis.Drive.v3.Data.File()
             {
                 Name = Path.GetFileName(destinationPath),
-                Parents = !string.IsNullOrWhiteSpace(folderId) ? new List<string> { folderId } : null
+                Parents = !string.IsNullOrWhiteSpace(targetFolderId) ? new List<string> { targetFolderId } : null
             };
 
             using var stream = new FileStream(filePath, FileMode.Open);
@@ -68,10 +88,10 @@ namespace PaperMind.Services.Implementations
             _log.Info($"Uploaded file to Google Drive: {request.ResponseBody?.Id}");
         }
 
-        private async Task<UserCredential> GetCredentialAsync()
+        private async Task<UserCredential> GetCredentialAsync(StorageRequestConfig? config = null)
         {
-            var clientId = _credentials.GetCredential("GoogleDrive_ClientId");
-            var clientSecret = _credentials.GetCredential("GoogleDrive_ClientSecret");
+            var clientId = config?.GoogleDriveClientId ?? _credentials.GetCredential("GoogleDrive_ClientId");
+            var clientSecret = config?.GoogleDriveClientSecret ?? _credentials.GetCredential("GoogleDrive_ClientSecret");
 
             if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
             {

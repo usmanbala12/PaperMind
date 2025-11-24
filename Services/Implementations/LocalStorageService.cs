@@ -6,7 +6,7 @@ namespace PaperMind.Services.Implementations
 {
     public class LocalStorageService : IStorageService
     {
-        public Task UploadAsync(string filePath, string destinationPath)
+        public Task UploadAsync(string filePath, string destinationPath, StorageRequestConfig? config = null)
         {
             // For local storage, destinationPath is the full path
             var dir = Path.GetDirectoryName(destinationPath);
