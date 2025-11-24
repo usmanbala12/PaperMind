@@ -44,6 +44,10 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
   <Target Name="DownloadTessdata" BeforeTargets="Build">
     <PropertyGroup>
       <TessdataDir>$(ProjectDir)tessdata</TessdataDir>
