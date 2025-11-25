@@ -88,7 +88,7 @@ namespace PaperMind.Services.Abstractions
     {
         string? Get(string key);
         T Get<T>(string key, T @default);
-        void Set(string key, string? value);
+        Task SetAsync(string key, string? value);
     }
 
     // Logging abstraction

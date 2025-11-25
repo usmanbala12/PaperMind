@@ -181,7 +181,10 @@ namespace PaperMind.Services.Implementations
                 Directory.CreateDirectory(job.OutputFolder);
 
                 job.Status = JobStatus.Running;
-                var files = Directory.EnumerateFiles(job.InputFolder, "*.pdf", SearchOption.TopDirectoryOnly).ToList();
+                // Case-insensitive PDF matching for cross-platform compatibility
+                var files = Directory.EnumerateFiles(job.InputFolder, "*.*", SearchOption.TopDirectoryOnly)
+                    .Where(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
                 job.TotalFiles = files.Count;
                 _repo.UpdateJob(job);
                 if (job.TotalFiles == 0)
@@ -559,9 +562,16 @@ namespace PaperMind.Services.Implementations
 
             try
             {
-                var watcher = new FileSystemWatcher(job.InputFolder, "*.pdf");
+                // Watch all files and filter manually for case-insensitive PDF matching
+                var watcher = new FileSystemWatcher(job.InputFolder, "*.*");
                 watcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite;
-                watcher.Created += async (s, e) => await ProcessWatchedFileAsync(job, e.FullPath);
+                watcher.Created += async (s, e) =>
+                {
+                    // Case-insensitive check for PDF extension
+                    if (!e.FullPath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                        return;
+                    await ProcessWatchedFileAsync(job, e.FullPath);
+                };
                 watcher.EnableRaisingEvents = true;
                 _watchers[job.JobId] = watcher;
             }

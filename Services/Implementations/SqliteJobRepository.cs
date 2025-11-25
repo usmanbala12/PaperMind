@@ -23,7 +23,9 @@ namespace PaperMind.Services.Implementations
             _connectionString = new SqliteConnectionStringBuilder
             {
                 DataSource = dbPath,
-                Mode = SqliteOpenMode.ReadWriteCreate
+                Mode = SqliteOpenMode.ReadWriteCreate,
+                Cache = SqliteCacheMode.Shared,  // Enable shared cache for better concurrency
+                Pooling = true  // Explicit connection pooling (default is true, but being explicit)
             }.ToString();
 
             EnsureSchema();
@@ -234,7 +236,7 @@ namespace PaperMind.Services.Implementations
             cmd.CommandText = "SELECT FileHash FROM JobFileStatus WHERE JobId = @JobId AND FilePath = @FilePath AND Status = 1";
             cmd.Parameters.Add(new SqliteParameter("@JobId", SqliteType.Text) { Value = jobId.ToString() });
             cmd.Parameters.Add(new SqliteParameter("@FilePath", SqliteType.Text) { Value = filePath });
-            
+
             var result = cmd.ExecuteScalar();
             return result == DBNull.Value || result == null ? null : result.ToString();
         }

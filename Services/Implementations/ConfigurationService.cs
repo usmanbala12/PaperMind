@@ -2,6 +2,8 @@ using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using PaperMind.Services.Abstractions;
 
 namespace PaperMind.Services.Implementations
@@ -10,18 +12,19 @@ namespace PaperMind.Services.Implementations
     {
         private readonly ConcurrentDictionary<string, string?> _cache = new();
         private readonly string _configFilePath;
-        private readonly object _fileLock = new();
+        private readonly SemaphoreSlim _fileLock = new(1, 1);
 
         public ConfigurationService()
         {
             var appDataFolder = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "PaperMind");
-            
+
             Directory.CreateDirectory(appDataFolder);
             _configFilePath = Path.Combine(appDataFolder, "config.json");
-            
-            LoadFromFile();
+
+            // Load synchronously in constructor to avoid deadlock during DI initialization
+            LoadFromFileSync();
         }
 
         public string? Get(string key)
@@ -48,53 +51,53 @@ namespace PaperMind.Services.Implementations
             }
         }
 
-        public void Set(string key, string? value)
+        public async Task SetAsync(string key, string? value)
         {
             if (string.IsNullOrWhiteSpace(key)) return;
-            
+
             _cache[key] = value;
-            SaveToFile();
+            await SaveToFileAsync();
         }
 
-        private void LoadFromFile()
+        private void LoadFromFileSync()
         {
-            lock (_fileLock)
+            // Use synchronous I/O in constructor to avoid deadlock issues during DI initialization
+            try
             {
-                try
+                if (File.Exists(_configFilePath))
                 {
-                    if (File.Exists(_configFilePath))
+                    var json = File.ReadAllText(_configFilePath);
+                    var settings = JsonSerializer.Deserialize<ConcurrentDictionary<string, string?>>(json);
+                    if (settings != null)
                     {
-                        var json = File.ReadAllText(_configFilePath);
-                        var settings = JsonSerializer.Deserialize<ConcurrentDictionary<string, string?>>(json);
-                        if (settings != null)
+                        foreach (var kvp in settings)
                         {
-                            foreach (var kvp in settings)
-                            {
-                                _cache[kvp.Key] = kvp.Value;
-                            }
+                            _cache[kvp.Key] = kvp.Value;
                         }
                     }
                 }
-                catch
-                {
-                    // Ignore errors during load - start with empty config
-                }
+            }
+            catch
+            {
+                // Ignore errors during load - start with empty config
             }
         }
 
-        private void SaveToFile()
+        private async Task SaveToFileAsync()
         {
-            lock (_fileLock)
+            await _fileLock.WaitAsync();
+            try
             {
-                try
-                {
-                    var json = JsonSerializer.Serialize(_cache, new JsonSerializerOptions { WriteIndented = true });
-                    File.WriteAllText(_configFilePath, json);
-                }
-                catch
-                {
-                    // Ignore errors during save
-                }
+                var json = JsonSerializer.Serialize(_cache, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(_configFilePath, json);
+            }
+            catch
+            {
+                // Ignore errors during save
+            }
+            finally
+            {
+                _fileLock.Release();
             }
         }
     }

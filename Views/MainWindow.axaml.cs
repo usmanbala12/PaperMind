@@ -156,8 +156,8 @@ namespace PaperMind.Views
             var jobService = App.Services.GetRequiredService<IProcessingJobService>();
             var configService = App.Services.GetRequiredService<IConfigurationService>();
 
-            // Persist the selected job ID
-            configService.Set(SelectedJobIdKey, job.JobId.ToString());
+            // Persist the selected job ID (fire and forget for now)
+            _ = configService.SetAsync(SelectedJobIdKey, job.JobId.ToString());
 
             _jobVm?.Dispose();
             _jobVm = new JobViewModel(jobService, job, navigateBack: ShowJobsList);

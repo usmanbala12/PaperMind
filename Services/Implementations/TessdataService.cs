@@ -9,12 +9,14 @@ namespace PaperMind.Services.Implementations
     public class TessdataService : ITessdataService
     {
         private readonly ILoggingService _logger;
+        private readonly HttpClient _httpClient;
         private const string TessdataUrl = "https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata";
         private const string TessdataFileName = "eng.traineddata";
 
-        public TessdataService(ILoggingService logger)
+        public TessdataService(ILoggingService logger, HttpClient httpClient)
         {
             _logger = logger;
+            _httpClient = httpClient;
         }
 
         public async Task EnsureTessdataExistsAsync()
@@ -37,8 +39,7 @@ namespace PaperMind.Services.Implementations
                     Directory.CreateDirectory(tessdataDir);
                 }
 
-                using var client = new HttpClient();
-                using var response = await client.GetAsync(TessdataUrl);
+                using var response = await _httpClient.GetAsync(TessdataUrl);
                 response.EnsureSuccessStatusCode();
 
                 using var stream = await response.Content.ReadAsStreamAsync();

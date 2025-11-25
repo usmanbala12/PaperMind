@@ -125,7 +125,7 @@ namespace PaperMind.Services.Implementations
         {
             var entry = new LogEntry
             {
-                Timestamp = DateTime.Now,
+                Timestamp = DateTime.UtcNow,
                 Level = level,
                 Message = message,
                 Exception = ex?.ToString()

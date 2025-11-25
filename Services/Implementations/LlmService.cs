@@ -19,7 +19,10 @@ namespace PaperMind.Services.Implementations
     {
         private readonly IConfigurationService _config;
         private readonly ILoggingService _log;
-        private static readonly HttpClient _http = new HttpClient();
+        private static readonly HttpClient _http = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(60) // Default timeout for LLM requests
+        };
 
         public LlmService(IConfigurationService config, ILoggingService log)
         {
@@ -141,7 +144,10 @@ namespace PaperMind.Services.Implementations
             using var body = new StringContent(jsonBody, Encoding.UTF8, "application/json");
             req.Content = body;
 
-            using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
+            // Add per-request timeout with cancellation token
+            var requestTimeout = _config.Get("LLM_REQUEST_TIMEOUT_SECONDS", 30);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(requestTimeout));
+            using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
 
             if (resp.StatusCode == (HttpStatusCode)429 || (int)resp.StatusCode >= 500)
                 throw new HttpRequestException($"OpenAI transient status: {(int)resp.StatusCode} {resp.ReasonPhrase}");
@@ -198,7 +204,10 @@ namespace PaperMind.Services.Implementations
             using var body = new StringContent(jsonBody, Encoding.UTF8, "application/json");
             req.Content = body;
 
-            using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
+            // Add per-request timeout with cancellation token
+            var requestTimeout = _config.Get("LLM_REQUEST_TIMEOUT_SECONDS", 30);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(requestTimeout));
+            using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
 
             if (resp.StatusCode == (HttpStatusCode)429 || (int)resp.StatusCode >= 500)
                 throw new HttpRequestException($"Anthropic transient status: {(int)resp.StatusCode} {resp.ReasonPhrase}");

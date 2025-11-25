@@ -45,7 +45,7 @@ namespace PaperMind.ViewModels
 
             LoadSettings();
 
-            SaveCommand = ReactiveCommand.Create(SaveSettings);
+            SaveCommand = ReactiveCommand.CreateFromTask(SaveSettingsAsync);
             ResetCommand = ReactiveCommand.Create(ResetSettings);
 
             ConnectGoogleDriveCommand = ReactiveCommand.CreateFromTask(ConnectGoogleDriveAsync);
@@ -199,17 +199,17 @@ namespace PaperMind.ViewModels
             }
         }
 
-        private void SaveSettings()
+        private async System.Threading.Tasks.Task SaveSettingsAsync()
         {
             try
             {
-                _config.Set("Theme", Theme);
-                _config.Set("OCR_LANGUAGE", OcrLanguage);
-                _config.Set("StorageProvider", StorageProvider.ToString());
+                await _config.SetAsync("Theme", Theme);
+                await _config.SetAsync("OCR_LANGUAGE", OcrLanguage);
+                await _config.SetAsync("StorageProvider", StorageProvider.ToString());
 
-                _config.Set("StorageConfig_GoogleDriveFolderId", GoogleDriveFolderId);
-                _config.Set("StorageConfig_DropboxFolderPath", DropboxFolderPath);
-                _config.Set("StorageConfig_OneDriveFolderPath", OneDriveFolderPath);
+                await _config.SetAsync("StorageConfig_GoogleDriveFolderId", GoogleDriveFolderId);
+                await _config.SetAsync("StorageConfig_DropboxFolderPath", DropboxFolderPath);
+                await _config.SetAsync("StorageConfig_OneDriveFolderPath", OneDriveFolderPath);
 
                 // Save credentials
                 if (!string.IsNullOrWhiteSpace(GoogleDriveClientId)) _credentials.SetCredential("GoogleDrive_ClientId", GoogleDriveClientId);
@@ -245,14 +245,14 @@ namespace PaperMind.ViewModels
 
         private async Task ConnectGoogleDriveAsync()
         {
-            SaveSettings(); // Ensure credentials are saved
+            await SaveSettingsAsync(); // Ensure credentials are saved
             var service = _storageFactory.Create(StorageProvider.GoogleDrive);
             IsGoogleDriveConnected = await service.AuthenticateAsync();
         }
 
         private async Task ConnectDropboxAsync()
         {
-            SaveSettings();
+            await SaveSettingsAsync();
             var service = _storageFactory.Create(StorageProvider.Dropbox);
             IsDropboxConnected = await service.AuthenticateAsync();
             // Refresh access token in UI if it was updated
@@ -261,7 +261,7 @@ namespace PaperMind.ViewModels
 
         private async Task ConnectOneDriveAsync()
         {
-            SaveSettings();
+            await SaveSettingsAsync();
             var service = _storageFactory.Create(StorageProvider.OneDrive);
             IsOneDriveConnected = await service.AuthenticateAsync();
         }

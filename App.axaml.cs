@@ -29,6 +29,9 @@ public partial class App : Application
         services.AddSingleton<ILLMService, LlmService>();
         services.AddSingleton<IPdfProcessor, PdfProcessor>();
         services.AddSingleton<IBatchProcessor, BatchProcessor>();
+        
+        // Register HttpClient for TessdataService
+        services.AddSingleton<System.Net.Http.HttpClient>();        
         services.AddSingleton<ITessdataService, TessdataService>();
 
         // Storage Services
