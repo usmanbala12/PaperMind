@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using PaperMind.Models;
 using PaperMind.Models.Enums;
@@ -22,13 +23,14 @@ namespace PaperMind.Services.Implementations.Steps
 
         public bool IsBatchable => false;
 
-        public Task ExecuteBatchAsync(JobContext[] contexts, JobStepConfig config)
+        public Task ExecuteBatchAsync(JobContext[] contexts, JobStepConfig config, CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException("Upload step does not support batching.");
         }
 
-        public async Task ExecuteAsync(JobContext context, JobStepConfig config)
+        public async Task ExecuteAsync(JobContext context, JobStepConfig config, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var path = context.CurrentFilePath;
 
             // Check if provider is specified in step config, otherwise fallback to global config

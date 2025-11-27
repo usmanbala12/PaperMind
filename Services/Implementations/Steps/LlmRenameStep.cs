@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using PaperMind.Models;
 using PaperMind.Models.Enums;
@@ -25,8 +26,9 @@ namespace PaperMind.Services.Implementations.Steps
 
         public bool IsBatchable => true;
 
-        public async Task ExecuteAsync(JobContext context, JobStepConfig config)
+        public async Task ExecuteAsync(JobContext context, JobStepConfig config, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // ... (keep existing implementation, maybe refactor common logic if needed, but for now keep as is or delegate)
             // Actually, let's keep the existing ExecuteAsync as is for single execution fallback
             var inputPath = context.CurrentFilePath;
@@ -60,9 +62,11 @@ namespace PaperMind.Services.Implementations.Steps
             ApplyRename(context, newName);
         }
 
-        public async Task ExecuteBatchAsync(JobContext[] contexts, JobStepConfig config)
+        public async Task ExecuteBatchAsync(JobContext[] contexts, JobStepConfig config, CancellationToken cancellationToken = default)
         {
             if (contexts.Length == 0) return;
+            
+            cancellationToken.ThrowIfCancellationRequested();
 
             var inputs = new Dictionary<string, string>();
             var contextMap = new Dictionary<string, JobContext>();

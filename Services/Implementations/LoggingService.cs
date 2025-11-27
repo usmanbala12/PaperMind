@@ -16,10 +16,13 @@ namespace PaperMind.Services.Implementations
     public sealed class LoggingService : ILoggingService, IDisposable
     {
         private const int MaxInMemoryLogs = 1000;
+        private const long MaxLogFileSize = 50 * 1024 * 1024; // 50MB
+        private const int LogRetentionDays = 30;
         private readonly ConcurrentQueue<LogEntry> _inMemoryLogs = new();
         private readonly Subject<LogEntry> _logSubject = new();
         private readonly SemaphoreSlim _fileLock = new(1, 1);
         private readonly string _logDirectory;
+        private DateTime _lastCleanupCheck = DateTime.MinValue;
 
         public IObservable<LogEntry> LogStream => _logSubject;
 
@@ -29,6 +32,9 @@ namespace PaperMind.Services.Implementations
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             _logDirectory = Path.Combine(appData, "PaperMind", "logs");
             Directory.CreateDirectory(_logDirectory);
+            
+            // Initial cleanup check
+            _ = Task.Run(() => CleanupOldLogsAsync());
         }
 
         public void Info(string message)
@@ -170,9 +176,19 @@ namespace PaperMind.Services.Implementations
             await _fileLock.WaitAsync();
             try
             {
+                // Check if log rotation is needed
+                await CheckAndRotateLogAsync(logFilePath);
+                
                 // Append JSON line to daily log file
                 await using var writer = new StreamWriter(logFilePath, append: true);
                 await writer.WriteLineAsync(entry.ToJson());
+                
+                // Periodic cleanup check (once per day)
+                if ((DateTime.UtcNow - _lastCleanupCheck).TotalHours > 24)
+                {
+                    _lastCleanupCheck = DateTime.UtcNow;
+                    _ = Task.Run(() => CleanupOldLogsAsync());
+                }
             }
             catch (Exception ex)
             {
@@ -189,6 +205,62 @@ namespace PaperMind.Services.Implementations
         {
             var fileName = $"papermind-{date:yyyy-MM-dd}.log";
             return Path.Combine(_logDirectory, fileName);
+        }
+
+        private async Task CheckAndRotateLogAsync(string logFilePath)
+        {
+            if (!File.Exists(logFilePath))
+                return;
+
+            var fileInfo = new FileInfo(logFilePath);
+            if (fileInfo.Length >= MaxLogFileSize)
+            {
+                // Rotate log by renaming with timestamp
+                var timestamp = DateTime.UtcNow.ToString("HHmmss");
+                var directory = Path.GetDirectoryName(logFilePath);
+                var fileNameWithoutExt = Path.GetFileNameWithoutExtension(logFilePath);
+                var rotatedPath = Path.Combine(directory!, $"{fileNameWithoutExt}-{timestamp}.log");
+                
+                try
+                {
+                    File.Move(logFilePath, rotatedPath);
+                    Debug.WriteLine($"Log rotated: {logFilePath} -> {rotatedPath}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to rotate log: {ex.Message}");
+                }
+            }
+        }
+
+        private async Task CleanupOldLogsAsync()
+        {
+            try
+            {
+                var cutoffDate = DateTime.UtcNow.AddDays(-LogRetentionDays);
+                var logFiles = Directory.GetFiles(_logDirectory, "*.log");
+                
+                foreach (var logFile in logFiles)
+                {
+                    try
+                    {
+                        var fileInfo = new FileInfo(logFile);
+                        if (fileInfo.LastWriteTimeUtc < cutoffDate)
+                        {
+                            File.Delete(logFile);
+                            Debug.WriteLine($"Deleted old log: {logFile}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Failed to delete old log {logFile}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to cleanup old logs: {ex.Message}");
+            }
         }
 
         public void Dispose()

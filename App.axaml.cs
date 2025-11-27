@@ -70,6 +70,13 @@ public partial class App : Application
         var log = Services.GetRequiredService<ILoggingService>();
         log.Info("Application starting.");
 
+        // Configure global ReactiveUI exception handler
+        ReactiveUI.RxApp.DefaultExceptionHandler = System.Reactive.Observer.Create<Exception>(ex =>
+        {
+            log.Error("Unhandled ReactiveUI exception", ex);
+            // In production, you might want to show a user-friendly error dialog here
+        });
+
         // Apply saved theme
         var themeService = Services.GetRequiredService<IThemeService>();
         if (Application.Current != null)

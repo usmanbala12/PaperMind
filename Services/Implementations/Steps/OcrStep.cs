@@ -1,6 +1,8 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
+using PaperMind.Helpers;
 using PaperMind.Models;
 using PaperMind.Models.Enums;
 using PaperMind.Models.Ocr;
@@ -23,14 +25,24 @@ namespace PaperMind.Services.Implementations.Steps
 
         public bool IsBatchable => false;
 
-        public Task ExecuteBatchAsync(JobContext[] contexts, JobStepConfig config)
+        public Task ExecuteBatchAsync(JobContext[] contexts, JobStepConfig config, CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException("OCR step does not support batching.");
         }
 
-        public async Task ExecuteAsync(JobContext context, JobStepConfig config)
+        public async Task ExecuteAsync(JobContext context, JobStepConfig config, CancellationToken cancellationToken = default)
         {
             var inputPath = context.CurrentFilePath;
+            
+            // Validate PDF before processing
+            if (!FileValidation.IsValidPdf(inputPath))
+            {
+                var errorMsg = FileValidation.GetInvalidPdfMessage(inputPath);
+                context.Logger.Error(errorMsg);
+                throw new InvalidOperationException(errorMsg);
+            }
+            
+            cancellationToken.ThrowIfCancellationRequested();
 
             // Determine output path. For now, we might overwrite or create a new file.
             // In the legacy logic, we had a specific flow. Here, let's assume we process in place or to a temp location
@@ -72,6 +84,8 @@ namespace PaperMind.Services.Implementations.Steps
             };
 
             context.Logger.Info($"[Job {context.Job.JobId}] OCR processing: {inputPath}");
+            
+            cancellationToken.ThrowIfCancellationRequested();
             var res = await _ocr.ProcessPdfAsync(inputPath, ocrConfig).ConfigureAwait(false);
 
             if (res.Success && File.Exists(res.OutputPath))
