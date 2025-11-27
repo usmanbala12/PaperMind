@@ -24,14 +24,21 @@ public partial class App : Application
 
         services.AddSingleton<ILoggingService, LoggingService>();
         services.AddSingleton<IConfigurationService, ConfigurationService>();
+        services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<ICredentialService, CredentialService>();
         services.AddSingleton<IOCRService, OcrService>();
         services.AddSingleton<ILLMService, LlmService>();
         services.AddSingleton<IPdfProcessor, PdfProcessor>();
         services.AddSingleton<IBatchProcessor, BatchProcessor>();
-        
+
+        // Configure HttpClient factory for LLM service
+        services.AddHttpClient("LlmClient", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
+
         // Register HttpClient for TessdataService
-        services.AddSingleton<System.Net.Http.HttpClient>();        
+        services.AddSingleton<System.Net.Http.HttpClient>();
         services.AddSingleton<ITessdataService, TessdataService>();
 
         // Storage Services
@@ -60,9 +67,15 @@ public partial class App : Application
         Services = ConfigureServices();
 
         // Log app start
-        // Log app start
         var log = Services.GetRequiredService<ILoggingService>();
         log.Info("Application starting.");
+
+        // Apply saved theme
+        var themeService = Services.GetRequiredService<IThemeService>();
+        if (Application.Current != null)
+        {
+            Application.Current.RequestedThemeVariant = themeService.CurrentTheme;
+        }
 
         // Ensure tessdata exists
         _ = Services.GetRequiredService<ITessdataService>().EnsureTessdataExistsAsync();

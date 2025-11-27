@@ -1,6 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Avalonia;
+using Avalonia.Styling;
 using PaperMind.Models.Enums;
 using PaperMind.Services.Abstractions;
 using PaperMind.Services.Implementations;
@@ -14,6 +18,7 @@ namespace PaperMind.ViewModels
         private readonly ICredentialService _credentials;
         private readonly ILoggingService _log;
         private readonly StorageServiceFactory _storageFactory;
+        private readonly IThemeService _themeService;
 
         private string _theme = "System";
         private string _ocrLanguage = "eng";
@@ -36,12 +41,13 @@ namespace PaperMind.ViewModels
         private bool _isDropboxConnected;
         private bool _isOneDriveConnected;
 
-        public SettingsViewModel(IConfigurationService config, ICredentialService credentials, ILoggingService log, StorageServiceFactory storageFactory)
+        public SettingsViewModel(IConfigurationService config, ICredentialService credentials, ILoggingService log, StorageServiceFactory storageFactory, IThemeService themeService)
         {
             _config = config;
             _credentials = credentials;
             _log = log;
             _storageFactory = storageFactory;
+            _themeService = themeService;
 
             LoadSettings();
 
@@ -53,10 +59,16 @@ namespace PaperMind.ViewModels
             ConnectOneDriveCommand = ReactiveCommand.CreateFromTask(ConnectOneDriveAsync);
         }
 
+        public string[] AvailableThemes => new[] { "System", "Light", "Dark" };
+
         public string Theme
         {
             get => _theme;
-            set => this.RaiseAndSetIfChanged(ref _theme, value);
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _theme, value);
+                ApplyTheme(value);
+            }
         }
 
         public string OcrLanguage
@@ -196,6 +208,23 @@ namespace PaperMind.ViewModels
             catch (Exception ex)
             {
                 _log.Error("Failed to load settings", ex);
+            }
+        }
+
+        private void ApplyTheme(string themeName)
+        {
+            var variant = themeName.ToLowerInvariant() switch
+            {
+                "dark" => ThemeVariant.Dark,
+                "light" => ThemeVariant.Light,
+                _ => ThemeVariant.Default
+            };
+
+            _themeService.SetTheme(variant);
+            
+            if (Application.Current != null)
+            {
+                Application.Current.RequestedThemeVariant = variant;
             }
         }
 

@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using PaperMind.Core;
 using PaperMind.Models;
 using PaperMind.Models.Enums;
 using PaperMind.Models.Ocr;
@@ -104,7 +105,7 @@ namespace PaperMind.Services.Implementations
                 pipeline.Add(new JobStepConfig { StepType = "UploadToCloud" });
             }
 
-            job.PipelineJson = System.Text.Json.JsonSerializer.Serialize(pipeline);
+            job.PipelineJson = System.Text.Json.JsonSerializer.Serialize(pipeline, AppJsonContext.Default.ListJobStepConfig);
 
             _jobs[job.JobId] = job;
             _repo.AddJob(job);
@@ -411,12 +412,12 @@ namespace PaperMind.Services.Implementations
             {
                 try
                 {
-                    pipeline = System.Text.Json.JsonSerializer.Deserialize<List<JobStepConfig>>(job.PipelineJson)
+                    pipeline = System.Text.Json.JsonSerializer.Deserialize(job.PipelineJson, AppJsonContext.Default.ListJobStepConfig)
                                ?? new List<JobStepConfig>();
                 }
-                catch
+                catch (Exception ex)
                 {
-                    _log.Warn($"Failed to deserialize pipeline for job {job.JobId}. Falling back to empty.");
+                    _log.Error($"Failed to deserialize pipeline for job {job.JobId}. Falling back to empty pipeline.", ex);
                     pipeline = new List<JobStepConfig>();
                 }
             }

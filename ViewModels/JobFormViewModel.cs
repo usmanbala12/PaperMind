@@ -8,6 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using PaperMind.Core;
 using PaperMind.Models;
 using PaperMind.Models.Enums;
 using PaperMind.Services.Abstractions;
@@ -180,7 +181,7 @@ namespace PaperMind.ViewModels
             {
                 try
                 {
-                    var steps = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<JobStepConfig>>(job.PipelineJson);
+                    var steps = System.Text.Json.JsonSerializer.Deserialize(job.PipelineJson, AppJsonContext.Default.ListJobStepConfig);
                     if (steps != null)
                     {
                         foreach (var s in steps)
@@ -240,7 +241,7 @@ namespace PaperMind.ViewModels
                     job.TriggerType = TriggerType;
 
                     var pipeline = PipelineSteps.Select(vm => vm.GetConfig()).ToList();
-                    job.PipelineJson = System.Text.Json.JsonSerializer.Serialize(pipeline);
+                    job.PipelineJson = System.Text.Json.JsonSerializer.Serialize(pipeline, AppJsonContext.Default.ListJobStepConfig);
 
                     await _jobsService.UpdateJobAsync(job);
                 }
@@ -254,7 +255,7 @@ namespace PaperMind.ViewModels
 
                 // Set pipeline JSON directly
                 var pipeline = PipelineSteps.Select(vm => vm.GetConfig()).ToList();
-                job.PipelineJson = System.Text.Json.JsonSerializer.Serialize(pipeline);
+                job.PipelineJson = System.Text.Json.JsonSerializer.Serialize(pipeline, AppJsonContext.Default.ListJobStepConfig);
 
                 // We need to update the job in the repo with the pipeline
                 await _jobsService.UpdateJobAsync(job);
@@ -272,7 +273,7 @@ namespace PaperMind.ViewModels
 
             // Set pipeline
             var pipeline = PipelineSteps.Select(vm => vm.GetConfig()).ToList();
-            job.PipelineJson = System.Text.Json.JsonSerializer.Serialize(pipeline);
+            job.PipelineJson = System.Text.Json.JsonSerializer.Serialize(pipeline, AppJsonContext.Default.ListJobStepConfig);
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {

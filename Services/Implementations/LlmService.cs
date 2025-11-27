@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -8,9 +9,10 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Http;
+using PaperMind.Core;
 using PaperMind.Models;
 using PaperMind.Services.Abstractions;
-using System.Collections.Generic;
 
 namespace PaperMind.Services.Implementations
 {
@@ -19,15 +21,13 @@ namespace PaperMind.Services.Implementations
     {
         private readonly IConfigurationService _config;
         private readonly ILoggingService _log;
-        private static readonly HttpClient _http = new HttpClient
-        {
-            Timeout = TimeSpan.FromSeconds(60) // Default timeout for LLM requests
-        };
+        private readonly IHttpClientFactory _httpClientFactory;
 
-        public LlmService(IConfigurationService config, ILoggingService log)
+        public LlmService(IConfigurationService config, ILoggingService log, IHttpClientFactory httpClientFactory)
         {
             _config = config;
             _log = log;
+            _httpClientFactory = httpClientFactory;
         }
 
         // Generate a concise, filesystem-safe filename based on extracted text.
@@ -147,7 +147,8 @@ namespace PaperMind.Services.Implementations
             // Add per-request timeout with cancellation token
             var requestTimeout = _config.Get("LLM_REQUEST_TIMEOUT_SECONDS", 30);
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(requestTimeout));
-            using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            using var http = _httpClientFactory.CreateClient("LlmClient");
+            using var resp = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
 
             if (resp.StatusCode == (HttpStatusCode)429 || (int)resp.StatusCode >= 500)
                 throw new HttpRequestException($"OpenAI transient status: {(int)resp.StatusCode} {resp.ReasonPhrase}");
@@ -207,7 +208,8 @@ namespace PaperMind.Services.Implementations
             // Add per-request timeout with cancellation token
             var requestTimeout = _config.Get("LLM_REQUEST_TIMEOUT_SECONDS", 30);
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(requestTimeout));
-            using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            using var http = _httpClientFactory.CreateClient("LlmClient");
+            using var resp = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
 
             if (resp.StatusCode == (HttpStatusCode)429 || (int)resp.StatusCode >= 500)
                 throw new HttpRequestException($"Anthropic transient status: {(int)resp.StatusCode} {resp.ReasonPhrase}");
@@ -374,7 +376,7 @@ namespace PaperMind.Services.Implementations
                     if (json.StartsWith("```")) json = json.Substring(3);
                     if (json.EndsWith("```")) json = json.Substring(0, json.Length - 3);
 
-                    var parsed = JsonSerializer.Deserialize<Dictionary<string, string>>(json.Trim());
+                    var parsed = JsonSerializer.Deserialize(json.Trim(), AppJsonContext.Default.DictionaryStringString);
                     if (parsed != null)
                     {
                         foreach (var kvp in parsed)

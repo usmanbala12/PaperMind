@@ -63,7 +63,8 @@ namespace PaperMind.Views
             }
 
             // Initialize Settings tab content
-            _settingsVm = new SettingsViewModel(configService, credentialService, loggingService, storageFactory);
+            var themeService = App.Services.GetRequiredService<IThemeService>();
+            _settingsVm = new SettingsViewModel(configService, credentialService, loggingService, storageFactory, themeService);
             _settingsView = new SettingsView { DataContext = _settingsVm };
             if (_settingsTabHost is not null)
             {

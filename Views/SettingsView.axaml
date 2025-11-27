@@ -16,11 +16,11 @@
           
           <StackPanel Spacing="8">
             <TextBlock Text="Theme" FontWeight="Medium"/>
-            <ComboBox Width="250" HorizontalAlignment="Left">
-              <ComboBoxItem IsSelected="True">System</ComboBoxItem>
-              <ComboBoxItem>Light</ComboBoxItem>
-              <ComboBoxItem>Dark</ComboBoxItem>
-            </ComboBox>
+            <ComboBox Width="250" HorizontalAlignment="Left" 
+                      ItemsSource="{Binding AvailableThemes}"
+                      SelectedItem="{Binding Theme}"/>
+            <TextBlock Text="Changes take effect immediately" 
+                       FontSize="11" Foreground="#6A737D"/>
           </StackPanel>
         </StackPanel>
       </Border>

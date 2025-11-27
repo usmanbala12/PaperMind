@@ -1,0 +1,29 @@
+# Configuration file for dotnet-releaser
+[msbuild]
+project = "PaperMind.sln"
+configuration = "Release"
+[github]
+user = "your_github_username"
+repo = "PaperMind"
+[nuget]
+publish = false
+
+# Windows platforms with zip
+[[pack]]
+rid = ["win-x64"]
+kinds = ["zip"]
+
+# Linux platforms with deb, rpm and tar
+[[pack]]
+rid = ["linux-x64"]
+kinds = ["deb", "rpm", "tar"]
+
+# macOS Intel
+[[pack]]
+rid = ["osx-x64"]
+kinds = ["tar"]
+
+# macOS ARM
+[[pack]]
+rid = ["osx-arm64"]
+kinds = ["tar"]

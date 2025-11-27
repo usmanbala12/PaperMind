@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using PaperMind.Core;
 using PaperMind.Services.Abstractions;
 
 namespace PaperMind.Services.Implementations
@@ -67,7 +68,7 @@ namespace PaperMind.Services.Implementations
                 if (File.Exists(_configFilePath))
                 {
                     var json = File.ReadAllText(_configFilePath);
-                    var settings = JsonSerializer.Deserialize<ConcurrentDictionary<string, string?>>(json);
+                    var settings = JsonSerializer.Deserialize(json, AppJsonContext.Default.ConcurrentDictionaryStringString);
                     if (settings != null)
                     {
                         foreach (var kvp in settings)
@@ -77,9 +78,10 @@ namespace PaperMind.Services.Implementations
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore errors during load - start with empty config
+                // Log error but continue with empty config
+                Console.Error.WriteLine($"Failed to load configuration from {_configFilePath}: {ex.Message}");
             }
         }
 
@@ -88,12 +90,13 @@ namespace PaperMind.Services.Implementations
             await _fileLock.WaitAsync();
             try
             {
-                var json = JsonSerializer.Serialize(_cache, new JsonSerializerOptions { WriteIndented = true });
+                var json = JsonSerializer.Serialize(_cache, AppJsonContext.Default.ConcurrentDictionaryStringString);
                 await File.WriteAllTextAsync(_configFilePath, json);
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore errors during save
+                // Log error - config save failures are important
+                Console.Error.WriteLine($"Failed to save configuration to {_configFilePath}: {ex.Message}");
             }
             finally
             {

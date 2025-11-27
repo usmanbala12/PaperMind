@@ -1,6 +1,7 @@
 using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using PaperMind.Core;
 using PaperMind.Models.Enums;
 
 namespace PaperMind.Models
@@ -45,10 +46,7 @@ namespace PaperMind.Models
         /// </summary>
         public string ToJson()
         {
-            return JsonSerializer.Serialize(this, new JsonSerializerOptions
-            {
-                WriteIndented = false
-            });
+            return JsonSerializer.Serialize(this, AppJsonContext.Default.LogEntry);
         }
 
         /// <summary>
@@ -58,7 +56,7 @@ namespace PaperMind.Models
         {
             try
             {
-                return JsonSerializer.Deserialize<LogEntry>(json);
+                return JsonSerializer.Deserialize(json, AppJsonContext.Default.LogEntry);
             }
             catch
             {
